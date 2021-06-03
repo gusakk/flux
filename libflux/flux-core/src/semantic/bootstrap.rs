@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::ast;
 use crate::parser;
@@ -85,9 +85,17 @@ impl From<&str> for Error {
 pub fn infer_stdlib() -> Result<(PolyTypeMap, PolyTypeMap, Fresher, Vec<String>), Error> {
     let mut f = Fresher::default();
 
-    let dir = "../../stdlib";
-    let files = file_map(parse_flux_files(dir)?);
-    let rerun_if_changed = compute_file_dependencies(dir);
+    let dir = std::env::current_dir()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("stdlib")
+        .canonicalize()
+        .unwrap();
+    let files = file_map(parse_flux_files(dir.as_path())?);
+    let rerun_if_changed = compute_file_dependencies(dir.as_path());
 
     let (prelude, importer) = infer_pre(&mut f, &files)?;
     let importer = infer_std(&mut f, &files, prelude.clone(), importer)?;
@@ -95,16 +103,8 @@ pub fn infer_stdlib() -> Result<(PolyTypeMap, PolyTypeMap, Fresher, Vec<String>)
     Ok((prelude, importer, f, rerun_if_changed))
 }
 
-fn compute_file_dependencies(root: &str) -> Vec<String> {
-    // Iterate through each ast file and canonicalize the
-    // file path to an absolute path.
-    // Canonicalize the root path to the absolute directory.
-    let rootpath = std::env::current_dir()
-        .unwrap()
-        .join(root)
-        .canonicalize()
-        .unwrap();
-    WalkDir::new(rootpath)
+fn compute_file_dependencies(root: &Path) -> Vec<String> {
+    WalkDir::new(root)
         .into_iter()
         .filter_map(|r| r.ok())
         .filter(|r| r.path().is_dir() || (r.path().is_file() && r.path().ends_with(".flux")))
@@ -149,9 +149,9 @@ fn infer_std(
 }
 
 // Recursively parse all flux files within a directory.
-fn parse_flux_files(path: &str) -> io::Result<Vec<ast::File>> {
+fn parse_flux_files(path: &Path) -> io::Result<Vec<ast::File>> {
     let mut files = Vec::new();
-    let entries = WalkDir::new(PathBuf::from(path))
+    let entries = WalkDir::new(path)
         .into_iter()
         .filter_map(|r| r.ok())
         .filter(|r| r.path().is_file());
@@ -422,7 +422,17 @@ mod tests {
 
     #[test]
     fn prelude_dependencies() {
-        let files = file_map(parse_flux_files("../../stdlib").unwrap());
+        let flux_files = std::env::current_dir()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("stdlib")
+            .canonicalize()
+            .and_then(|p| parse_flux_files(p.as_path()))
+            .unwrap();
+        let files = file_map(flux_files);
 
         let r = PRELUDE.iter().try_fold(
             (Vec::new(), HashSet::new(), HashSet::new()),
