@@ -305,7 +305,7 @@ fn infer_pkg(
             let file = files.get(pkg_path.as_str());
             if file.is_none() {
                 return Err(Error {
-                    msg: format!(r#"package "{}" not found"#, pkg),
+                    msg: format!(r#"package "{}" not found"#, pkg_path),
                 });
             }
             let file = file.unwrap().to_owned();
@@ -322,10 +322,14 @@ fn infer_pkg(
         }
     }
 
-    let file = files.get(name);
+    let mut name_path = name.to_string();
+    if consts::OS == "windows" {
+        name_path = name_path.replace("/", "\\");
+    }
+    let file = files.get(name_path.as_str());
     if file.is_none() {
         return Err(Error {
-            msg: format!("package '{}' not found", name),
+            msg: format!("package '{}' not found", name_path),
         });
     }
     let file = file.unwrap().to_owned();
