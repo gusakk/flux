@@ -23,7 +23,11 @@ use crate::semantic::types::{
 
 use walkdir::WalkDir;
 
+#[cfg(not(target_os = "windows"))]
 const PRELUDE: [&str; 2] = ["universe", "influxdata/influxdb"];
+
+#[cfg(target_os = "windows")]
+const PRELUDE: [&str; 2] = ["universe", "influxdata\\influxdb"];
 
 type AstFileMap = SemanticMap<String, ast::File>;
 
@@ -148,6 +152,12 @@ fn infer_std(
     Ok(imports)
 }
 
+#[cfg(not(target_os = "windows"))]
+const STDLIB_PATTERN: &str = "/stdlib/";
+
+#[cfg(target_os = "windows")]
+const STDLIB_PATTERN: &str = "\\stdlib\\";
+
 // Recursively parse all flux files within a directory.
 fn parse_flux_files(path: &Path) -> io::Result<Vec<ast::File>> {
     let mut files = Vec::new();
@@ -156,15 +166,11 @@ fn parse_flux_files(path: &Path) -> io::Result<Vec<ast::File>> {
         .filter_map(|r| r.ok())
         .filter(|r| r.path().is_file());
 
-    let mut stdlib_pat = String::with_capacity(8);
-    stdlib_pat.push(MAIN_SEPARATOR);
-    stdlib_pat.push_str("stdlib");
-    stdlib_pat.push(MAIN_SEPARATOR);
     for entry in entries {
         if let Some(path) = entry.path().to_str() {
             if path.ends_with(".flux") && !path.ends_with("_test.flux") {
                 files.push(parser::parse_string(
-                    path.rsplitn(2, stdlib_pat.as_str()).collect::<Vec<&str>>()[0],
+                    path.rsplitn(2, STDLIB_PATTERN).collect::<Vec<&str>>()[0],
                     &fs::read_to_string(path)?,
                 ));
             }
