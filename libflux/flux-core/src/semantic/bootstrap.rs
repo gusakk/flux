@@ -94,7 +94,7 @@ pub fn infer_stdlib() -> Result<(PolyTypeMap, PolyTypeMap, Fresher, Vec<String>)
     let mut f = Fresher::default();
 
     let files = file_map(parse_flux_files(STDLIB_RELATIVE_PATH)?);
-    let rerun_if_changed = compute_file_dependencies(dir.as_path());
+    let rerun_if_changed = compute_file_dependencies(STDLIB_RELATIVE_PATH);
 
     let (prelude, importer) = infer_pre(&mut f, &files)?;
     let importer = infer_std(&mut f, &files, prelude.clone(), importer)?;
