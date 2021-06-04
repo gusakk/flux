@@ -1,6 +1,7 @@
 //! Flux start-up.
 
 use std::collections::HashSet;
+use std::env::consts;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR};
@@ -23,11 +24,7 @@ use crate::semantic::types::{
 
 use walkdir::WalkDir;
 
-#[cfg(not(target_os = "windows"))]
 const PRELUDE: [&str; 2] = ["universe", "influxdata/influxdb"];
-
-#[cfg(target_os = "windows")]
-const PRELUDE: [&str; 2] = ["universe", "influxdata\\influxdb"];
 
 type AstFileMap = SemanticMap<String, ast::File>;
 
@@ -300,8 +297,12 @@ fn infer_pkg(
 
     // Infer all dependencies
     for pkg in deps {
+        let mut pkg_path = pkg.to_string();
+        if consts::OS == "windows" {
+            pkg_path = pkg_path.replace("/", "\\");
+        }
         if imports.import(pkg).is_none() {
-            let file = files.get(pkg);
+            let file = files.get(pkg_path.as_str());
             if file.is_none() {
                 return Err(Error {
                     msg: format!(r#"package "{}" not found"#, pkg),
