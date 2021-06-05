@@ -295,8 +295,6 @@ fn infer_pkg(
     ),
     Error,
 > {
-    println!("Files: {:?}", files);
-    println!("Imports: {:?}", imports);
     // Determine the order in which we must infer dependencies
     let (deps, _, _) = dependencies(name, files, Vec::new(), HashSet::new(), HashSet::new())?;
 
