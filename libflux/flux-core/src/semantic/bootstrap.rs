@@ -1,7 +1,6 @@
 //! Flux start-up.
 
 use std::collections::HashSet;
-use std::env::consts;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR};
@@ -273,6 +272,12 @@ fn build_record(from: PolyTypeMap, f: &mut Fresher) -> (Record, Constraints) {
     (r, cons)
 }
 
+#[cfg(not(target_os = "windows"))]
+const IS_WINDOWS: bool = false;
+
+#[cfg(target_os = "windows")]
+const IS_WINDOWS: bool = true;
+
 // Infer the types in a package(file), returning a hash map containing
 // the inferred types along with a possibly updated map of package imports.
 //
@@ -290,6 +295,8 @@ fn infer_pkg(
     ),
     Error,
 > {
+    println!("Files: {:?}", files);
+    println!("Imports: {:?}", imports);
     // Determine the order in which we must infer dependencies
     let (deps, _, _) = dependencies(name, files, Vec::new(), HashSet::new(), HashSet::new())?;
 
@@ -298,7 +305,7 @@ fn infer_pkg(
     // Infer all dependencies
     for pkg in deps {
         let mut pkg_path = pkg.to_string();
-        if consts::OS == "windows" {
+        if IS_WINDOWS {
             pkg_path = pkg_path.replace("/", "\\");
         }
         if imports.import(pkg).is_none() {
@@ -323,7 +330,7 @@ fn infer_pkg(
     }
 
     let mut name_path = name.to_string();
-    if consts::OS == "windows" {
+    if IS_WINDOWS {
         name_path = name_path.replace("/", "\\");
     }
     let file = files.get(name_path.as_str());
