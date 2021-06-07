@@ -1,9 +1,12 @@
 //! Flux start-up.
 
 use std::collections::HashSet;
+use std::env::consts;
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf, MAIN_SEPARATOR};
+use std::path::{MAIN_SEPARATOR, Path, PathBuf};
+
+use walkdir::WalkDir;
 
 use crate::ast;
 use crate::parser;
@@ -20,8 +23,6 @@ use crate::semantic::types;
 use crate::semantic::types::{
     MonoType, PolyType, PolyTypeMap, Property, Record, SemanticMap, TvarKinds,
 };
-
-use walkdir::WalkDir;
 
 const PRELUDE: [&str; 2] = ["universe", "influxdata/influxdb"];
 
@@ -80,11 +81,13 @@ impl From<&str> for Error {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
-const STDLIB_RELATIVE_PATH: &str = "../../stdlib";
-
-#[cfg(target_os = "windows")]
-const STDLIB_RELATIVE_PATH: &str = "..\\..\\stdlib";
+fn stdlib_relative_path() -> &'static str {
+    if consts::OS == "windows" {
+        "..\\..\\stdlib"
+    } else {
+        "../../stdlib"
+    }
+}
 
 /// Infers the types of the standard library returning two [`PolyTypeMap`]s, one for the prelude
 /// and one for the standard library, as well as a type variable [`Fresher`].
@@ -92,8 +95,9 @@ const STDLIB_RELATIVE_PATH: &str = "..\\..\\stdlib";
 pub fn infer_stdlib() -> Result<(PolyTypeMap, PolyTypeMap, Fresher, Vec<String>), Error> {
     let mut f = Fresher::default();
 
-    let files = file_map(parse_flux_files(STDLIB_RELATIVE_PATH)?);
-    let rerun_if_changed = compute_file_dependencies(STDLIB_RELATIVE_PATH);
+    let path = stdlib_relative_path();
+    let files = file_map(parse_flux_files(path)?);
+    let rerun_if_changed = compute_file_dependencies(path);
 
     let (prelude, importer) = infer_pre(&mut f, &files)?;
     let importer = infer_std(&mut f, &files, prelude.clone(), importer)?;
@@ -154,12 +158,6 @@ fn infer_std(
     Ok(imports)
 }
 
-#[cfg(not(target_os = "windows"))]
-const STDLIB_PATTERN: &str = "/stdlib/";
-
-#[cfg(target_os = "windows")]
-const STDLIB_PATTERN: &str = "\\stdlib\\";
-
 // Recursively parse all flux files within a directory.
 fn parse_flux_files(path: &str) -> io::Result<Vec<ast::File>> {
     let mut files = Vec::new();
@@ -168,11 +166,17 @@ fn parse_flux_files(path: &str) -> io::Result<Vec<ast::File>> {
         .filter_map(|r| r.ok())
         .filter(|r| r.path().is_file());
 
+    let stdlib_pattern = if consts::OS == "windows" {
+        "\\stdlib\\"
+    } else {
+        "/stdlib/"
+    };
+
     for entry in entries {
         if let Some(path) = entry.path().to_str() {
             if path.ends_with(".flux") && !path.ends_with("_test.flux") {
                 files.push(parser::parse_string(
-                    path.rsplitn(2, STDLIB_PATTERN).collect::<Vec<&str>>()[0],
+                    path.rsplitn(2, stdlib_pattern).collect::<Vec<&str>>()[0],
                     &fs::read_to_string(path)?,
                 ));
             }
@@ -209,13 +213,18 @@ fn dependencies<'a>(
     mut seen: HashSet<&'a str>,
     mut done: HashSet<&'a str>,
 ) -> Result<(Vec<&'a str>, HashSet<&'a str>, HashSet<&'a str>), Error> {
+    let is_windows = consts::OS == "windows";
+    let mut pkg_name = name.to_string();
+    if is_windows {
+        pkg_name = pkg_name.replace("/", "\\");
+    }
     if seen.contains(name) && !done.contains(name) {
         Err(Error {
             msg: format!(r#"package "{}" depends on itself"#, name),
         })
     } else {
         seen.insert(name);
-        match pkgs.get(name) {
+        match pkgs.get(pkg_name.as_str()) {
             None => Err(Error {
                 msg: format!(r#"package "{}" not found"#, name),
             }),
@@ -272,12 +281,6 @@ fn build_record(from: PolyTypeMap, f: &mut Fresher) -> (Record, Constraints) {
     (r, cons)
 }
 
-#[cfg(not(target_os = "windows"))]
-const IS_WINDOWS: bool = false;
-
-#[cfg(target_os = "windows")]
-const IS_WINDOWS: bool = true;
-
 // Infer the types in a package(file), returning a hash map containing
 // the inferred types along with a possibly updated map of package imports.
 //
@@ -300,10 +303,12 @@ fn infer_pkg(
 
     let mut imports = imports;
 
+    let is_windows = consts::OS == "windows";
+
     // Infer all dependencies
     for pkg in deps {
         let mut pkg_path = pkg.to_string();
-        if IS_WINDOWS {
+        if is_windows {
             pkg_path = pkg_path.replace("/", "\\");
         }
         if imports.import(pkg).is_none() {
@@ -321,14 +326,14 @@ fn infer_pkg(
                 f,
                 &imports,
             )?
-            .0;
+                .0;
 
             imports.insert(pkg.to_string(), build_polytype(env.values, f)?);
         }
     }
 
     let mut name_path = name.to_string();
-    if IS_WINDOWS {
+    if is_windows {
         name_path = name_path.replace("/", "\\");
     }
     let file = files.get(name_path.as_str());
@@ -345,18 +350,19 @@ fn infer_pkg(
         f,
         &imports,
     )?
-    .0;
+        .0;
 
     Ok((env.values, imports))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::ast::get_err_type_expression;
     use crate::parser;
     use crate::parser::parse_string;
     use crate::semantic::convert::convert_polytype;
+
+    use super::*;
 
     #[test]
     fn infer_program() -> Result<(), Error> {
@@ -448,7 +454,7 @@ mod tests {
 
     #[test]
     fn prelude_dependencies() {
-        let files = file_map(parse_flux_files(STDLIB_RELATIVE_PATH).unwrap());
+        let files = file_map(parse_flux_files(stdlib_relative_path()).unwrap());
 
         let r = PRELUDE.iter().try_fold(
             (Vec::new(), HashSet::new(), HashSet::new()),
@@ -457,7 +463,7 @@ mod tests {
 
         let names = r.unwrap().0;
 
-        assert_eq!(vec!["system", "date", "math", "strings", "regexp"], names,);
+        assert_eq!(vec!["system", "date", "math", "strings", "regexp"], names, );
     }
 
     #[test]
