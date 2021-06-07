@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::env::consts;
 use std::fs;
 use std::io;
-use std::path::{MAIN_SEPARATOR, Path, PathBuf};
+use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 
 use walkdir::WalkDir;
 
@@ -326,7 +326,7 @@ fn infer_pkg(
                 f,
                 &imports,
             )?
-                .0;
+            .0;
 
             imports.insert(pkg.to_string(), build_polytype(env.values, f)?);
         }
@@ -350,7 +350,7 @@ fn infer_pkg(
         f,
         &imports,
     )?
-        .0;
+    .0;
 
     Ok((env.values, imports))
 }
@@ -463,7 +463,7 @@ mod tests {
 
         let names = r.unwrap().0;
 
-        assert_eq!(vec!["system", "date", "math", "strings", "regexp"], names, );
+        assert_eq!(vec!["system", "date", "math", "strings", "regexp"], names,);
     }
 
     #[test]
