@@ -195,7 +195,7 @@ fn parse_flux_files(path: &str) -> io::Result<Vec<ast::File>> {
 // Associates an import path with each file
 fn file_map(files: Vec<ast::File>) -> AstFileMap {
     files.into_iter().fold(AstFileMap::new(), |mut acc, file| {
-        let name = file.name.rsplitn(2, "/").collect::<Vec<&str>>()[1].to_string();
+        let name = file.name.rsplitn(2, '/').collect::<Vec<&str>>()[1].to_string();
         acc.insert(name, file);
         acc
     })
