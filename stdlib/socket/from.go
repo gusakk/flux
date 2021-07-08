@@ -162,14 +162,14 @@ func createFromSocketSource(s plan.ProcedureSpec, dsid execute.DatasetID, a exec
 		return nil, errors.Wrap(err, codes.Inherit, "error in creating socket source")
 	}
 
-	return NewSocketSource(spec, conn, &nowTimeProvider{}, dsid)
+	return NewSocketSource(context.Background(), spec, conn, &nowTimeProvider{}, dsid)
 }
 
-func NewSocketSource(spec *FromSocketProcedureSpec, rc io.ReadCloser, tp line.TimeProvider, dsid execute.DatasetID) (execute.Source, error) {
+func NewSocketSource(ctx context.Context, spec *FromSocketProcedureSpec, rc io.ReadCloser, tp line.TimeProvider, dsid execute.DatasetID) (execute.Source, error) {
 	var decoder flux.ResultDecoder
 	switch spec.Decoder {
 	case "csv":
-		decoder = csv.NewResultDecoder(csv.ResultDecoderConfig{})
+		decoder = csv.NewResultDecoder(ctx, csv.ResultDecoderConfig{})
 	case "line":
 		decoder = line.NewResultDecoder(&line.ResultDecoderConfig{
 			Separator:    '\n',

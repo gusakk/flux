@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 
@@ -110,7 +111,7 @@ csv.from(csv: %v)
 
 func csvLacksMeasurementColumn(a *ast.VariableAssignment) (bool, error) {
 	bb := bytes.NewBuffer([]byte(a.Init.(*ast.StringLiteral).Value))
-	dec := csv.NewResultDecoder(csv.ResultDecoderConfig{})
+	dec := csv.NewResultDecoder(context.Background(), csv.ResultDecoderConfig{})
 	r, err := dec.Decode(bb)
 	if err != nil {
 		return false, err

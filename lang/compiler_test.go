@@ -806,7 +806,7 @@ func getTablesFromRawOrFail(t *testing.T, rawData string) []*executetest.Table {
 	t.Helper()
 
 	b := bytes.NewReader([]byte(rawData))
-	result, err := fcsv.NewResultDecoder(fcsv.ResultDecoderConfig{}).Decode(b)
+	result, err := fcsv.NewResultDecoder(context.Background(), fcsv.ResultDecoderConfig{}).Decode(b)
 	if err != nil {
 		t.Fatal(err)
 	}

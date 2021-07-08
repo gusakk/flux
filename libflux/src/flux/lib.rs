@@ -1,4 +1,4 @@
-#![cfg_attr(feature = "strict", deny(warnings, missing_docs))]
+#![cfg_attr(feature = "strict", deny(errors, missing_docs))]
 #![allow(clippy::unknown_clippy_lints)]
 //! The flux crate handles the parsing and semantic analysis of flux source
 //! code.

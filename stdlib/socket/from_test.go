@@ -215,7 +215,7 @@ source
 			c := execute.NewTableBuilderCache(executetest.UnlimitedAllocator)
 			c.SetTriggerSpec(plan.DefaultTriggerSpec)
 			r := ioutil.NopCloser(bytes.NewReader([]byte(tc.input)))
-			ss, err := socket.NewSocketSource(tc.spec, r, &mock.AscendingTimeProvider{}, id)
+			ss, err := socket.NewSocketSource(context.Background(), tc.spec, r, &mock.AscendingTimeProvider{}, id)
 			if err != nil {
 				t.Fatal(err)
 			}
