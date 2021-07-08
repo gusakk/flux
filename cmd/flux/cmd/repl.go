@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"context"
-	"github.com/influxdata/flux"
-	_ "github.com/influxdata/flux/builtin"
-	"github.com/influxdata/flux/dependencies/filesystem"
-	"github.com/influxdata/flux/memory"
-	"github.com/influxdata/flux/repl"
+	"github.com/gusakk/flux"
+	_ "github.com/gusakk/flux/builtin"
+	"github.com/gusakk/flux/dependencies/filesystem"
+	"github.com/gusakk/flux/memory"
+	"github.com/gusakk/flux/repl"
 	"github.com/spf13/cobra"
 )
 

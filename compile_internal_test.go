@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/interpreter"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/interpreter"
+	"github.com/gusakk/flux/values"
 )
 
 func TestValidatePackageBuiltins(t *testing.T) {

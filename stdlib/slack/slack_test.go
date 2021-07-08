@@ -10,14 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/ast"
-	_ "github.com/influxdata/flux/builtin"
-	_ "github.com/influxdata/flux/csv"
-	"github.com/influxdata/flux/dependencies/dependenciestest"
-	"github.com/influxdata/flux/lang"
-	"github.com/influxdata/flux/memory"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/ast"
+	_ "github.com/gusakk/flux/builtin"
+	_ "github.com/gusakk/flux/csv"
+	"github.com/gusakk/flux/dependencies/dependenciestest"
+	"github.com/gusakk/flux/lang"
+	"github.com/gusakk/flux/memory"
+	"github.com/gusakk/flux/values"
 )
 
 func TestSlack(t *testing.T) {

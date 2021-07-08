@@ -7,15 +7,15 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/compiler"
-	"github.com/influxdata/flux/dependencies/dependenciestest"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/execute/executetest"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/semantic/semantictest"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/compiler"
+	"github.com/gusakk/flux/dependencies/dependenciestest"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/execute/executetest"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/semantic/semantictest"
+	"github.com/gusakk/flux/values"
 )
 
 var CmpOptions = semantictest.CmpOptions

@@ -6,13 +6,13 @@ import (
 	"time"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
-	"github.com/influxdata/flux"
-	_ "github.com/influxdata/flux/builtin" // We need to import the builtins for the tests to work.
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/execute/executetest"
-	"github.com/influxdata/flux/querytest"
-	"github.com/influxdata/flux/stdlib/experimental/mqtt"
-	"github.com/influxdata/flux/stdlib/influxdata/influxdb"
+	"github.com/gusakk/flux"
+	_ "github.com/gusakk/flux/builtin" // We need to import the builtins for the tests to work.
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/execute/executetest"
+	"github.com/gusakk/flux/querytest"
+	"github.com/gusakk/flux/stdlib/experimental/mqtt"
+	"github.com/gusakk/flux/stdlib/influxdata/influxdb"
 )
 
 func TestToMQTT_NewQuery(t *testing.T) {

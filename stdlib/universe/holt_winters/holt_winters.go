@@ -5,8 +5,8 @@ import (
 
 	"github.com/apache/arrow/go/arrow/array"
 	"github.com/apache/arrow/go/arrow/memory"
-	"github.com/influxdata/flux/arrow"
-	"github.com/influxdata/flux/internal/mutable"
+	"github.com/gusakk/flux/arrow"
+	"github.com/gusakk/flux/internal/mutable"
 )
 
 // HoltWinters forecasts a series into the future.

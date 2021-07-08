@@ -11,18 +11,18 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/ast/edit"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/csv"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/internal/errors"
-	"github.com/influxdata/flux/lang"
-	"github.com/influxdata/flux/memory"
-	"github.com/influxdata/flux/parser"
-	_ "github.com/influxdata/flux/stdlib" // Import the Flux standard library
-	"github.com/influxdata/flux/stdlib/testing"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/ast/edit"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/csv"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/internal/errors"
+	"github.com/gusakk/flux/lang"
+	"github.com/gusakk/flux/memory"
+	"github.com/gusakk/flux/parser"
+	_ "github.com/gusakk/flux/stdlib" // Import the Flux standard library
+	"github.com/gusakk/flux/stdlib/testing"
 	"github.com/spf13/cobra"
 )
 

@@ -3,8 +3,8 @@ package socket
 import (
 	"testing"
 
-	"github.com/influxdata/flux/dependencies/url"
-	"github.com/influxdata/flux/execute/executetest"
+	"github.com/gusakk/flux/dependencies/url"
+	"github.com/gusakk/flux/execute/executetest"
 )
 
 func TestFromSocketUrlValidation(t *testing.T) {

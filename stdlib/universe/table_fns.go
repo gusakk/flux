@@ -4,16 +4,16 @@ import (
 	"context"
 	"time"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/compiler"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/internal/errors"
-	"github.com/influxdata/flux/interpreter"
-	"github.com/influxdata/flux/lang"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/values"
-	"github.com/influxdata/flux/values/objects"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/compiler"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/internal/errors"
+	"github.com/gusakk/flux/interpreter"
+	"github.com/gusakk/flux/lang"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/values"
+	"github.com/gusakk/flux/values/objects"
 )
 
 const (

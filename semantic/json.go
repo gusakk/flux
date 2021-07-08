@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
 )
 
 func (p *Package) MarshalJSON() ([]byte, error) {

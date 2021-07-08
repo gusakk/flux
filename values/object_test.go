@@ -3,7 +3,7 @@ package values_test
 import (
 	"testing"
 
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux/values"
 )
 
 func TestObjectEqual(t *testing.T) {

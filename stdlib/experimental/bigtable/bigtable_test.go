@@ -8,16 +8,16 @@ import (
 
 	"cloud.google.com/go/bigtable"
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/execute/executetest"
-	"github.com/influxdata/flux/interpreter"
-	"github.com/influxdata/flux/mock"
-	"github.com/influxdata/flux/plan"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/stdlib/universe"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/execute/executetest"
+	"github.com/gusakk/flux/interpreter"
+	"github.com/gusakk/flux/mock"
+	"github.com/gusakk/flux/plan"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/stdlib/universe"
+	"github.com/gusakk/flux/values"
 )
 
 var rRowKey *semantic.MemberExpression = &semantic.MemberExpression{

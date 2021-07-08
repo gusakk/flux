@@ -3,10 +3,10 @@ package table
 import (
 	"reflect"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/internal/errors"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/internal/errors"
 )
 
 // Builder is the minimum interface for constructing a Table.

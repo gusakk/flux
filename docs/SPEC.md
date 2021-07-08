@@ -271,7 +271,7 @@ Examples:
     2009-10-15T09:00:00       // October 15th 2009 at 9 AM in the default location
     2018-01-01                // midnight on January 1st 2018 in the default location
 
-[IMPL#152](https://github.com/influxdata/flux/issues/152) Implement shorthand time literals
+[IMPL#152](https://github.com/gusakk/flux/issues/152) Implement shorthand time literals
 
 #### String literals
 
@@ -323,7 +323,7 @@ Interpolation example:
     "the answer is not ${n+1}" // the answer is not 43
     "dollar sign opening curly bracket \${" // dollar sign opening curly bracket ${
 
-[IMPL#1775](https://github.com/influxdata/flux/issues/1775) Interpolate arbitrary expressions in string literals
+[IMPL#1775](https://github.com/gusakk/flux/issues/1775) Interpolate arbitrary expressions in string literals
 
 
 #### Regular expression literals
@@ -1328,7 +1328,7 @@ Examples:
     fixedZone(offset:4h30m) // time zone 4 and a half hours east of UTC
 
 
-[IMPL#156](https://github.com/influxdata/flux/issues/156) Implement FixedZone function
+[IMPL#156](https://github.com/gusakk/flux/issues/156) Implement FixedZone function
 
 #### LoadLocation
 
@@ -1346,7 +1346,7 @@ Examples:
     loadLocation(name:"America/Chicago")
     loadLocation(name:"Africa/Tunis")
 
-[IMPL#157](https://github.com/influxdata/flux/issues/157) Implement LoadLoacation function
+[IMPL#157](https://github.com/gusakk/flux/issues/157) Implement LoadLoacation function
 
 ## Data model
 
@@ -1384,7 +1384,7 @@ These common values are referred to as the group key value, and can be represent
 
 A tables schema consists of its group key, and its column's labels and types.
 
-[IMPL#463](https://github.com/influxdata/flux/issues/463) Specify the primitive types that make up stream and table types
+[IMPL#463](https://github.com/gusakk/flux/issues/463) Specify the primitive types that make up stream and table types
 
 ### Stream of tables
 
@@ -1392,7 +1392,7 @@ A stream represents a potentially unbounded set of tables.
 A stream is grouped into individual tables using the group key.
 Within a stream each table's group key value is unique.
 
-[IMPL#463](https://github.com/influxdata/flux/issues/463) Specify the primitive types that make up stream and table types
+[IMPL#463](https://github.com/gusakk/flux/issues/463) Specify the primitive types that make up stream and table types
 
 ### Missing values (null)
 
@@ -2949,8 +2949,8 @@ Both `tables` and `on` are required parameters.
 The `on` parameter and the `cross` method are mutually exclusive.
 Join currently only supports two input streams.
 
-[IMPL#83](https://github.com/influxdata/flux/issues/83) Add support for joining more than 2 streams  
-[IMPL#84](https://github.com/influxdata/flux/issues/84) Add support for different join types  
+[IMPL#83](https://github.com/gusakk/flux/issues/83) Add support for joining more than 2 streams  
+[IMPL#84](https://github.com/gusakk/flux/issues/84) Add support for different join types  
 
 Example:
 
@@ -4205,7 +4205,7 @@ Example: `from(bucket: "telegraf") |> filter(fn:(r) => r._measurement == "mem" a
 The function `toDuration` is defined as `toDuration = (tables=<-) => tables |> map(fn:(r) => ({r with _value: duration(v:r._value)}))`.
 If you need to convert other columns use the `map` function directly with the `duration` function.
 
-TODO: implement duration as a column type in tables (https://github.com/influxdata/flux/issues/470)
+TODO: implement duration as a column type in tables (https://github.com/gusakk/flux/issues/470)
 
 ##### toString
 

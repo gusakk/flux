@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/influxdata/flux/cmd/flux/cmd"
+	"github.com/gusakk/flux/cmd/flux/cmd"
 	// Register the sqlite3 database driver.
 	_ "github.com/mattn/go-sqlite3"
 )

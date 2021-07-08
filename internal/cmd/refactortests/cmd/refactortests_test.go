@@ -1,15 +1,15 @@
 package cmd
 
 import (
-	"github.com/influxdata/flux/ast/edit"
+	"github.com/gusakk/flux/ast/edit"
 	"testing"
 
-	_ "github.com/influxdata/flux/stdlib" // Import the Flux standard library
+	_ "github.com/gusakk/flux/stdlib" // Import the Flux standard library
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/ast/asttest"
-	"github.com/influxdata/flux/parser"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/ast/asttest"
+	"github.com/gusakk/flux/parser"
 )
 
 func getRunTestPattern(testCaseName string) *ast.CallExpression {

@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux/dependencies/dependenciestest"
-	"github.com/influxdata/flux/internal/spec"
-	"github.com/influxdata/flux/plan"
-	"github.com/influxdata/flux/plan/plantest"
+	"github.com/gusakk/flux/dependencies/dependenciestest"
+	"github.com/gusakk/flux/internal/spec"
+	"github.com/gusakk/flux/plan"
+	"github.com/gusakk/flux/plan/plantest"
 )
 
 func TestRuleRegistration(t *testing.T) {

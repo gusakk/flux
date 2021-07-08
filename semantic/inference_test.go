@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/parser"
-	"github.com/influxdata/flux/semantic"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/parser"
+	"github.com/gusakk/flux/semantic"
 )
 
 func TestInferTypes(t *testing.T) {

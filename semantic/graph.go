@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/semantic/types"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/semantic/types"
 )
 
 type Node interface {

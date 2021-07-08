@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
 )
 
 // TypeExpression represents an expression describing a type.

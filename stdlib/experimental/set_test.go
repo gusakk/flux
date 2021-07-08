@@ -4,11 +4,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/execute/executetest"
-	"github.com/influxdata/flux/stdlib/experimental"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/execute/executetest"
+	"github.com/gusakk/flux/stdlib/experimental"
+	"github.com/gusakk/flux/values"
 )
 
 // newOrderedObject creates a object with sorted keys order

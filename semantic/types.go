@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
 )
 
 // Type is the representation of a Flux type.

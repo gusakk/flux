@@ -2,9 +2,9 @@ package moving_average
 
 import (
 	"github.com/apache/arrow/go/arrow/array"
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/values"
 )
 
 type ExponentialMovingAverage struct {

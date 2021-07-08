@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/ast/asttest"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/ast/asttest"
 )
 
 func TestWalk(t *testing.T) {

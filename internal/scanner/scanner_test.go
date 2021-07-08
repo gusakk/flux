@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/influxdata/flux/internal/scanner"
-	"github.com/influxdata/flux/internal/token"
+	"github.com/gusakk/flux/internal/scanner"
+	"github.com/gusakk/flux/internal/token"
 )
 
 type TokenPattern struct {

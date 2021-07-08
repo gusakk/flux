@@ -1,6 +1,6 @@
 package plan
 
-import "github.com/influxdata/flux/values"
+import "github.com/gusakk/flux/values"
 
 // EmptyBounds is a time range containing only a single point
 var EmptyBounds = &Bounds{

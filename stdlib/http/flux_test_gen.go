@@ -3,8 +3,8 @@
 package http
 
 import (
-	ast "github.com/influxdata/flux/ast"
-	parser "github.com/influxdata/flux/internal/parser"
+	ast "github.com/gusakk/flux/ast"
+	parser "github.com/gusakk/flux/internal/parser"
 )
 
 var FluxTestPackages = []*ast.Package{&ast.Package{

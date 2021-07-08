@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/execute/executetest"
-	"github.com/influxdata/flux/line"
-	"github.com/influxdata/flux/mock"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/execute/executetest"
+	"github.com/gusakk/flux/line"
+	"github.com/gusakk/flux/mock"
 )
 
 func TestResultDecoder(t *testing.T) {

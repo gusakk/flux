@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/ast"
-	_ "github.com/influxdata/flux/builtin"
-	"github.com/influxdata/flux/csv"
-	"github.com/influxdata/flux/execute/executetest"
-	"github.com/influxdata/flux/lang"
-	"github.com/influxdata/flux/memory"
-	"github.com/influxdata/flux/parser"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/ast"
+	_ "github.com/gusakk/flux/builtin"
+	"github.com/gusakk/flux/csv"
+	"github.com/gusakk/flux/execute/executetest"
+	"github.com/gusakk/flux/lang"
+	"github.com/gusakk/flux/memory"
+	"github.com/gusakk/flux/parser"
 )
 
 func Example_fromGenerator() {

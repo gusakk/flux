@@ -3,7 +3,7 @@
 package semantic
 
 import (
-	"github.com/influxdata/flux/libflux/go/libflux"
+	"github.com/gusakk/flux/libflux/go/libflux"
 )
 
 // AnalyzeSource parses and analyzes the given Flux source,

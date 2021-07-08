@@ -4,9 +4,9 @@ import (
 	"context"
 	"io"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/execute/executetest"
-	"github.com/influxdata/flux/memory"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/execute/executetest"
+	"github.com/gusakk/flux/memory"
 )
 
 type Querier struct{}

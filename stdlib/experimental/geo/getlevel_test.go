@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/influxdata/flux/builtin"
-	"github.com/influxdata/flux/querytest"
-	"github.com/influxdata/flux/stdlib/experimental/geo"
-	"github.com/influxdata/flux/values"
+	_ "github.com/gusakk/flux/builtin"
+	"github.com/gusakk/flux/querytest"
+	"github.com/gusakk/flux/stdlib/experimental/geo"
+	"github.com/gusakk/flux/values"
 )
 
 func TestGetLevel_NewQuery(t *testing.T) {

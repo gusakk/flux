@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/internal/parser"
-	"github.com/influxdata/flux/internal/token"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/internal/parser"
+	"github.com/gusakk/flux/internal/token"
 )
 
 var skip = map[string]string{}

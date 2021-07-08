@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	flux "github.com/influxdata/flux"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
+	flux "github.com/gusakk/flux"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
 )
 
 // additional and seperate tests that can be run without needing functions to be Exported in sql, just to be testable

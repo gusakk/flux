@@ -8,14 +8,14 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/dependencies/dependenciestest"
-	"github.com/influxdata/flux/interpreter"
-	"github.com/influxdata/flux/interpreter/interptest"
-	"github.com/influxdata/flux/parser"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/semantic/semantictest"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/dependencies/dependenciestest"
+	"github.com/gusakk/flux/interpreter"
+	"github.com/gusakk/flux/interpreter/interptest"
+	"github.com/gusakk/flux/parser"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/semantic/semantictest"
+	"github.com/gusakk/flux/values"
 )
 
 var testScope = values.NewNestedScope(nil, values.NewObjectWithValues(

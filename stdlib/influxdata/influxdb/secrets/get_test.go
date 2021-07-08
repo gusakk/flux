@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/influxdata/flux/dependencies/dependenciestest"
-	"github.com/influxdata/flux/dependencies/secret"
-	"github.com/influxdata/flux/mock"
-	"github.com/influxdata/flux/stdlib/influxdata/influxdb/secrets"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux/dependencies/dependenciestest"
+	"github.com/gusakk/flux/dependencies/secret"
+	"github.com/gusakk/flux/mock"
+	"github.com/gusakk/flux/stdlib/influxdata/influxdb/secrets"
+	"github.com/gusakk/flux/values"
 )
 
 func TestGet(t *testing.T) {

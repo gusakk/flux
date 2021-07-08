@@ -3,7 +3,7 @@ package arrow
 import (
 	"github.com/apache/arrow/go/arrow"
 	"github.com/apache/arrow/go/arrow/array"
-	"github.com/influxdata/flux/memory"
+	"github.com/gusakk/flux/memory"
 )
 
 func NewString(vs []string, alloc *memory.Allocator) *array.Binary {

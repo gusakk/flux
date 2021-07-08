@@ -1,8 +1,8 @@
 package executetest
 
 import (
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/dependencies/dependenciestest"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/dependencies/dependenciestest"
 )
 
 func NewTestExecuteDependencies() flux.Dependencies {

@@ -1,6 +1,6 @@
 package plantest
 
-import "github.com/influxdata/flux/plan"
+import "github.com/gusakk/flux/plan"
 
 const MockKind = "mock"
 

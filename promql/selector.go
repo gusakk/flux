@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/influxdata/flux/ast"
+	"github.com/gusakk/flux/ast"
 	"github.com/influxdata/promql/v2"
 	"github.com/influxdata/promql/v2/pkg/labels"
 )

@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/flux"
-	_ "github.com/influxdata/flux/builtin"
-	"github.com/influxdata/flux/execute/executetest"
-	"github.com/influxdata/flux/lang"
-	"github.com/influxdata/flux/memory"
+	"github.com/gusakk/flux"
+	_ "github.com/gusakk/flux/builtin"
+	"github.com/gusakk/flux/execute/executetest"
+	"github.com/gusakk/flux/lang"
+	"github.com/gusakk/flux/memory"
 )
 
 func runQuery(script string) (flux.Query, error) {

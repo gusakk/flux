@@ -6,11 +6,11 @@ import (
 	"github.com/apache/arrow/go/arrow"
 	"github.com/apache/arrow/go/arrow/array"
 	"github.com/apache/arrow/go/arrow/memory"
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/values"
 )
 
 // NewBuilder constructs a new builder for the given

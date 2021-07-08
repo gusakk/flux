@@ -176,7 +176,7 @@ pub unsafe extern "C" fn flux_ast_marshal_fb(
         }
     };
 
-    // Note, split_off() does a copy: https://github.com/influxdata/flux/issues/2194
+    // Note, split_off() does a copy: https://github.com/gusakk/flux/issues/2194
     let data = vec.split_off(offset);
     (*buf).len = data.len();
     (*buf).data = Box::into_raw(data.into_boxed_slice()) as *mut u8;
@@ -211,7 +211,7 @@ pub unsafe extern "C" fn flux_semantic_marshal_fb(
         }
     };
 
-    // Note, split_off() does a copy: https://github.com/influxdata/flux/issues/2194
+    // Note, split_off() does a copy: https://github.com/gusakk/flux/issues/2194
     let data = vec.split_off(offset);
     (*buf).len = data.len();
     (*buf).data = Box::into_raw(data.into_boxed_slice()) as *mut u8;

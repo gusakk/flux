@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	_ "github.com/influxdata/flux/builtin"
-	"github.com/influxdata/flux/querytest"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/stdlib/experimental/geo"
-	"github.com/influxdata/flux/values"
+	_ "github.com/gusakk/flux/builtin"
+	"github.com/gusakk/flux/querytest"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/stdlib/experimental/geo"
+	"github.com/gusakk/flux/values"
 )
 
 func TestGetGrid_NewQuery(t *testing.T) {

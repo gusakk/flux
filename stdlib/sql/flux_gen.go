@@ -3,8 +3,8 @@
 package sql
 
 import (
-	flux "github.com/influxdata/flux"
-	ast "github.com/influxdata/flux/ast"
+	flux "github.com/gusakk/flux"
+	ast "github.com/gusakk/flux/ast"
 )
 
 func init() {

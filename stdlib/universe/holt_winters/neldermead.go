@@ -4,7 +4,7 @@ import (
 	"math"
 
 	"github.com/apache/arrow/go/arrow/memory"
-	"github.com/influxdata/flux/internal/mutable"
+	"github.com/gusakk/flux/internal/mutable"
 )
 
 const (

@@ -4,7 +4,7 @@ package semantic_test
 
 import (
 	"errors"
-	"github.com/influxdata/flux/semantic"
+	"github.com/gusakk/flux/semantic"
 	"testing"
 )
 

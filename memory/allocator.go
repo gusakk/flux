@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 
 	"github.com/apache/arrow/go/arrow/memory"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
 )
 
 // DefaultAllocator is the default memory allocator for Flux.

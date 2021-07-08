@@ -9,10 +9,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/influxdata/flux/ast"
-	gparser "github.com/influxdata/flux/internal/parser"
-	"github.com/influxdata/flux/internal/token"
-	"github.com/influxdata/flux/libflux/go/libflux"
+	"github.com/gusakk/flux/ast"
+	gparser "github.com/gusakk/flux/internal/parser"
+	"github.com/gusakk/flux/internal/token"
+	"github.com/gusakk/flux/libflux/go/libflux"
 )
 
 func BenchmarkRustParse(b *testing.B) {

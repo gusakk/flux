@@ -12,10 +12,10 @@ import (
 
 	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/parser"
-	"github.com/influxdata/flux/semantic/internal/fbsemantic"
-	"github.com/influxdata/flux/semantic/types"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/parser"
+	"github.com/gusakk/flux/semantic/internal/fbsemantic"
+	"github.com/gusakk/flux/semantic/types"
 )
 
 var cmpOpts = []cmp.Option{
@@ -883,7 +883,7 @@ func TestFlatBuffersRoundTrip(t *testing.T) {
 			},
 		},
 		{
-			// This seems to be a bug: https://github.com/influxdata/flux/issues/2355
+			// This seems to be a bug: https://github.com/gusakk/flux/issues/2355
 			name: "exists operator with tvar and call",
 			fluxSrc: `
                 f = (r) => exists r.foo

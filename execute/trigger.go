@@ -3,8 +3,8 @@ package execute
 import (
 	"fmt"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/plan"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/plan"
 )
 
 type Trigger interface {

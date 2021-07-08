@@ -3,8 +3,8 @@ package plan_test
 import (
 	"testing"
 
-	"github.com/influxdata/flux/plan"
-	"github.com/influxdata/flux/plan/plantest"
+	"github.com/gusakk/flux/plan"
+	"github.com/gusakk/flux/plan/plantest"
 )
 
 func TestPlanSpec_CheckIntegrity(t *testing.T) {

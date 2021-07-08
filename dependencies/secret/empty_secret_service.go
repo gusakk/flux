@@ -2,8 +2,8 @@ package secret
 
 import (
 	"context"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
 )
 
 func (ess EmptySecretService) LoadSecret(ctx context.Context, k string) (string, error) {

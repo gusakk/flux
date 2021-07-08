@@ -1,6 +1,6 @@
 package table_test
 
-import "github.com/influxdata/flux"
+import "github.com/gusakk/flux"
 
 type TableIterator []flux.Table
 

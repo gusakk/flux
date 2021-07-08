@@ -2,10 +2,10 @@ package bigtable
 
 import (
 	"cloud.google.com/go/bigtable"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/plan"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/stdlib/universe"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/plan"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/stdlib/universe"
 	"time"
 )
 

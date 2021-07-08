@@ -3,7 +3,7 @@ package builtin_test
 import (
 	"testing"
 
-	_ "github.com/influxdata/flux/builtin"
+	_ "github.com/gusakk/flux/builtin"
 )
 
 func TestBuiltins(t *testing.T) {

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/memory"
-	"github.com/influxdata/flux/plan"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/memory"
+	"github.com/gusakk/flux/plan"
 )
 
 // Transformation represents functions that stream a set of tables, performs

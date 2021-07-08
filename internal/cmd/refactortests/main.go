@@ -1,6 +1,6 @@
 package main
 
-import "github.com/influxdata/flux/internal/cmd/refactortests/cmd"
+import "github.com/gusakk/flux/internal/cmd/refactortests/cmd"
 
 func main() {
 	cmd.Execute()

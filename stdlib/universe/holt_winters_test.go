@@ -4,13 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/execute/executetest"
-	"github.com/influxdata/flux/memory"
-	"github.com/influxdata/flux/querytest"
-	"github.com/influxdata/flux/stdlib/influxdata/influxdb"
-	"github.com/influxdata/flux/stdlib/universe"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/execute/executetest"
+	"github.com/gusakk/flux/memory"
+	"github.com/gusakk/flux/querytest"
+	"github.com/gusakk/flux/stdlib/influxdata/influxdb"
+	"github.com/gusakk/flux/stdlib/universe"
 )
 
 func TestHoltWinters_NewQuery(t *testing.T) {

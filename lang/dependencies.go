@@ -3,7 +3,7 @@ package lang
 import (
 	"context"
 
-	"github.com/influxdata/flux/memory"
+	"github.com/gusakk/flux/memory"
 
 	"go.uber.org/zap"
 )

@@ -8,17 +8,17 @@ import (
 
 	"github.com/apache/arrow/go/arrow/array"
 	arrowmemory "github.com/apache/arrow/go/arrow/memory"
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/arrow"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/internal/errors"
-	"github.com/influxdata/flux/internal/execute/table"
-	"github.com/influxdata/flux/interpreter"
-	"github.com/influxdata/flux/memory"
-	"github.com/influxdata/flux/plan"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/arrow"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/internal/errors"
+	"github.com/gusakk/flux/internal/execute/table"
+	"github.com/gusakk/flux/interpreter"
+	"github.com/gusakk/flux/memory"
+	"github.com/gusakk/flux/plan"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/values"
 )
 
 //go:generate -command tmpl ../../gotool.sh github.com/benbjohnson/tmpl
@@ -116,13 +116,13 @@ type PivotProcedureSpec struct {
 	// IsSortedByFunc is a function that can be set by the planner
 	// that can be used to determine if the parent is sorted by
 	// the given columns.
-	// TODO(jsternberg): See https://github.com/influxdata/flux/issues/2131 for details.
+	// TODO(jsternberg): See https://github.com/gusakk/flux/issues/2131 for details.
 	IsSortedByFunc func(cols []string, desc bool) bool
 
 	// IsKeyColumnFunc is a function that can be set by the planner
 	// that can be used to determine if the given column would be
 	// part of the group key if it were present.
-	// TODO(jsternberg): See https://github.com/influxdata/flux/issues/2131 for details.
+	// TODO(jsternberg): See https://github.com/gusakk/flux/issues/2131 for details.
 	IsKeyColumnFunc func(label string) bool
 }
 
@@ -565,7 +565,7 @@ func (t *pivotTransformation2) validateTable(tbl flux.Table) error {
 func (t *pivotTransformation2) computeGroupKey(key flux.GroupKey) flux.GroupKey {
 	// TODO(jsternberg): This can be optimized further when we
 	// refactor the group key implementation so it is more composable.
-	// https://github.com/influxdata/flux/issues/1032
+	// https://github.com/gusakk/flux/issues/1032
 	// There's no requirement for us to copy the group key here
 	// as this is a simple filter and we also don't even know if
 	// we're going to even filter anything when we compute this.

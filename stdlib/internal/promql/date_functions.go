@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/values"
 	"github.com/pkg/errors"
 )
 

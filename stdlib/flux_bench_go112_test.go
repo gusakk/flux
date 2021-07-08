@@ -5,7 +5,7 @@ package stdlib_test
 import (
 	"testing"
 
-	"github.com/influxdata/flux"
+	"github.com/gusakk/flux"
 )
 
 func reportStatistics(b *testing.B, stats flux.Statistics) {

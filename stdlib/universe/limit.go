@@ -4,14 +4,14 @@ import (
 	"context"
 
 	"github.com/apache/arrow/go/arrow/array"
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/arrow"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/internal/errors"
-	"github.com/influxdata/flux/internal/execute/table"
-	"github.com/influxdata/flux/plan"
-	"github.com/influxdata/flux/semantic"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/arrow"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/internal/errors"
+	"github.com/gusakk/flux/internal/execute/table"
+	"github.com/gusakk/flux/plan"
+	"github.com/gusakk/flux/semantic"
 )
 
 const LimitKind = "limit"

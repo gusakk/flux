@@ -6,9 +6,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/semantic/semantictest"
-	"github.com/influxdata/flux/stdlib/universe"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/semantic/semantictest"
+	"github.com/gusakk/flux/stdlib/universe"
 )
 
 func OperationMarshalingTestHelper(t *testing.T, data []byte, expOp *flux.Operation) {

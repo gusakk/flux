@@ -8,12 +8,12 @@ import (
 
 	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/ast/internal/fbast"
-	gparser "github.com/influxdata/flux/internal/parser"
-	"github.com/influxdata/flux/internal/token"
-	"github.com/influxdata/flux/libflux/go/libflux"
-	rparser "github.com/influxdata/flux/parser"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/ast/internal/fbast"
+	gparser "github.com/gusakk/flux/internal/parser"
+	"github.com/gusakk/flux/internal/token"
+	"github.com/gusakk/flux/libflux/go/libflux"
+	rparser "github.com/gusakk/flux/parser"
 )
 
 var CompareOptions = []cmp.Option{

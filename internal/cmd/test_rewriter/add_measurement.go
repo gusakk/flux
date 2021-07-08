@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/csv"
-	"github.com/influxdata/flux/internal/errors"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/csv"
+	"github.com/gusakk/flux/internal/errors"
 	"github.com/spf13/cobra"
 )
 

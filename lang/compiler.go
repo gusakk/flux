@@ -6,16 +6,16 @@ import (
 	"log"
 	"time"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/internal/errors"
-	"github.com/influxdata/flux/internal/spec"
-	"github.com/influxdata/flux/memory"
-	"github.com/influxdata/flux/plan"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/internal/errors"
+	"github.com/gusakk/flux/internal/spec"
+	"github.com/gusakk/flux/memory"
+	"github.com/gusakk/flux/plan"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/values"
 	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
 )
@@ -430,7 +430,7 @@ func getRules(plannerPkg values.Object, optionName string) ([]string, error) {
 	//  an option of a type to another. So we should be able to rely on the fact that the type
 	//  for value is fixed. At the moment is it not so.
 	//  So, we have to check and return an error to avoid a panic.
-	//  See (https://github.com/influxdata/flux/issues/1829).
+	//  See (https://github.com/gusakk/flux/issues/1829).
 	if t := value.Type().Nature(); t != semantic.Array {
 		return nil, fmt.Errorf("'planner.%s' must be an array of string, got %s", optionName, t.String())
 	}

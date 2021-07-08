@@ -16,7 +16,7 @@ import (
 	"strings"
 )
 
-const modulePath = "github.com/influxdata/flux"
+const modulePath = "github.com/gusakk/flux"
 
 type Module struct {
 	Path      string

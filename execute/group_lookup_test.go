@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/internal/gen"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/internal/gen"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/values"
 )
 
 // This tests that groups keys are sorted lexicographically according to the entire key.

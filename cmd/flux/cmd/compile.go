@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	_ "github.com/influxdata/flux/builtin"
-	"github.com/influxdata/flux/lang"
+	_ "github.com/gusakk/flux/builtin"
+	"github.com/gusakk/flux/lang"
 	"github.com/spf13/cobra"
 )
 

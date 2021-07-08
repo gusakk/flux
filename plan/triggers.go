@@ -1,6 +1,6 @@
 package plan
 
-import "github.com/influxdata/flux"
+import "github.com/gusakk/flux"
 
 type TriggerSpec interface {
 	Kind() TriggerKind

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/interpreter"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/interpreter"
+	"github.com/gusakk/flux/values"
 	"github.com/opentracing/opentracing-go"
 )
 

@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/internal/scanner"
-	"github.com/influxdata/flux/internal/token"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/internal/scanner"
+	"github.com/gusakk/flux/internal/token"
 )
 
 const (

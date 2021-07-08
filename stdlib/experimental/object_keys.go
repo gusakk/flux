@@ -3,12 +3,12 @@ package experimental
 import (
 	"context"
 
-	flux "github.com/influxdata/flux"
-	"github.com/influxdata/flux/codes"
+	flux "github.com/gusakk/flux"
+	"github.com/gusakk/flux/codes"
 
-	"github.com/influxdata/flux/internal/errors"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux/internal/errors"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/values"
 )
 
 func init() {

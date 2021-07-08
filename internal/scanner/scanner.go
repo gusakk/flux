@@ -3,7 +3,7 @@ package scanner
 import (
 	"unicode/utf8"
 
-	"github.com/influxdata/flux/internal/token"
+	"github.com/gusakk/flux/internal/token"
 )
 
 // use uneeded generated constants to satisify staticcheck

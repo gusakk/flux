@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/dependencies/dependenciestest"
-	"github.com/influxdata/flux/internal/errors"
-	"github.com/influxdata/flux/stdlib/runtime"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/dependencies/dependenciestest"
+	"github.com/gusakk/flux/internal/errors"
+	"github.com/gusakk/flux/stdlib/runtime"
+	"github.com/gusakk/flux/values"
 )
 
 func TestVersion(t *testing.T) {
@@ -25,9 +25,9 @@ func TestVersion(t *testing.T) {
 		{
 			name: "main module",
 			bi: &debug.BuildInfo{
-				Path: "github.com/influxdata/flux",
+				Path: "github.com/gusakk/flux",
 				Main: debug.Module{
-					Path:    "github.com/influxdata/flux",
+					Path:    "github.com/gusakk/flux",
 					Version: "v0.38.0",
 				},
 			},
@@ -36,12 +36,12 @@ func TestVersion(t *testing.T) {
 		{
 			name: "replaced main module",
 			bi: &debug.BuildInfo{
-				Path: "github.com/influxdata/flux",
+				Path: "github.com/gusakk/flux",
 				Main: debug.Module{
-					Path:    "github.com/influxdata/flux",
+					Path:    "github.com/gusakk/flux",
 					Version: "v0.38.0",
 					Replace: &debug.Module{
-						Path:    "github.com/influxdata/flux",
+						Path:    "github.com/gusakk/flux",
 						Version: "(devel)",
 					},
 				},
@@ -58,7 +58,7 @@ func TestVersion(t *testing.T) {
 				},
 				Deps: []*debug.Module{
 					{
-						Path:    "github.com/influxdata/flux",
+						Path:    "github.com/gusakk/flux",
 						Version: "v0.38.0",
 					},
 				},
@@ -75,10 +75,10 @@ func TestVersion(t *testing.T) {
 				},
 				Deps: []*debug.Module{
 					{
-						Path:    "github.com/influxdata/flux",
+						Path:    "github.com/gusakk/flux",
 						Version: "v0.38.0",
 						Replace: &debug.Module{
-							Path: "github.com/influxdata/flux",
+							Path: "github.com/gusakk/flux",
 						},
 					},
 				},

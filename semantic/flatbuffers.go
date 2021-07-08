@@ -5,11 +5,11 @@ import (
 	"time"
 
 	flatbuffers "github.com/google/flatbuffers/go"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
-	"github.com/influxdata/flux/semantic/internal/fbsemantic"
-	"github.com/influxdata/flux/semantic/types"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
+	"github.com/gusakk/flux/semantic/internal/fbsemantic"
+	"github.com/gusakk/flux/semantic/types"
 )
 
 func DeserializeFromFlatBuffer(buf []byte) (*Package, error) {

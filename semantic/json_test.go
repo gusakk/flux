@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/semantic/semantictest"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/semantic/semantictest"
 )
 
 func TestJSONMarshal(t *testing.T) {

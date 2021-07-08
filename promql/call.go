@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/influxdata/flux/ast"
+	"github.com/gusakk/flux/ast"
 	"github.com/influxdata/promql/v2"
 	"github.com/prometheus/common/model"
 )

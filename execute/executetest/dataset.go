@@ -5,9 +5,9 @@ import (
 
 	uuid "github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/plan"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/plan"
 )
 
 func RandomDatasetID() execute.DatasetID {

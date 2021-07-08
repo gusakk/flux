@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/ast/asttest"
-	"github.com/influxdata/flux/internal/token"
-	"github.com/influxdata/flux/parser"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/ast/asttest"
+	"github.com/gusakk/flux/internal/token"
+	"github.com/gusakk/flux/parser"
 )
 
 func wantMetadata() string {

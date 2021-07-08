@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	flux "github.com/influxdata/flux"
-	"github.com/influxdata/flux/values"
+	flux "github.com/gusakk/flux"
+	"github.com/gusakk/flux/values"
 	_ "github.com/mattn/go-sqlite3"
 )
 

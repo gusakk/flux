@@ -2,7 +2,7 @@ package arrow
 
 import (
 	"github.com/apache/arrow/go/arrow/array"
-	"github.com/influxdata/flux/memory"
+	"github.com/gusakk/flux/memory"
 )
 
 func NewBool(vs []bool, alloc *memory.Allocator) *array.Boolean {

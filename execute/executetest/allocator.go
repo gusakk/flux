@@ -1,7 +1,7 @@
 package executetest
 
 import (
-	"github.com/influxdata/flux/memory"
+	"github.com/gusakk/flux/memory"
 )
 
 var UnlimitedAllocator = &memory.Allocator{}

@@ -4,8 +4,8 @@
 package builtin
 
 import (
-	"github.com/influxdata/flux"
-	_ "github.com/influxdata/flux/stdlib" // Import the stdlib
+	"github.com/gusakk/flux"
+	_ "github.com/gusakk/flux/stdlib" // Import the stdlib
 )
 
 func init() {

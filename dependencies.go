@@ -2,12 +2,12 @@ package flux
 
 import (
 	"context"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/dependencies/filesystem"
-	"github.com/influxdata/flux/dependencies/http"
-	"github.com/influxdata/flux/dependencies/secret"
-	"github.com/influxdata/flux/dependencies/url"
-	"github.com/influxdata/flux/internal/errors"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/dependencies/filesystem"
+	"github.com/gusakk/flux/dependencies/http"
+	"github.com/gusakk/flux/dependencies/secret"
+	"github.com/gusakk/flux/dependencies/url"
+	"github.com/gusakk/flux/internal/errors"
 )
 
 var _ Dependencies = (*Deps)(nil)

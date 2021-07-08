@@ -38,7 +38,7 @@ In order to contribute back to Flux, you must sign the
 [InfluxData Contributor License Agreement](https://www.influxdata.com/legal/cla/) (CLA).
 
 ### Finding an issue
-The Flux team regularly adds the [community](https://github.com/influxdata/flux/issues?q=is%3Aopen+is%3Aissue+label%3Acommunity) label to issues that we think would be accessible for a community member to take.
+The Flux team regularly adds the [community](https://github.com/gusakk/flux/issues?q=is%3Aopen+is%3Aissue+label%3Acommunity) label to issues that we think would be accessible for a community member to take.
 Before starting to work on an issue, please inform us on GitHub about your intention to work on the issue by leaving a comment on the issue.
 This allows us to know that you want to work on the issue, that the issue is updated with the needed information, and to be ready for a pull request when the work is done.
 

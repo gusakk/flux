@@ -5,10 +5,10 @@ import (
 	"sync/atomic"
 
 	"github.com/apache/arrow/go/arrow/array"
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/arrow"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/arrow"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
 )
 
 // SendFunc is used to send a flux.ColReader to a table stream so

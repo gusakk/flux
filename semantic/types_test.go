@@ -3,7 +3,7 @@ package semantic_test
 import (
 	"testing"
 
-	"github.com/influxdata/flux/semantic"
+	"github.com/gusakk/flux/semantic"
 )
 
 func MustType(e semantic.Expression) semantic.Type {

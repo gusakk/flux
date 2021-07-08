@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
-	"github.com/influxdata/flux/memory"
-	"github.com/influxdata/flux/plan"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
+	"github.com/gusakk/flux/memory"
+	"github.com/gusakk/flux/plan"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

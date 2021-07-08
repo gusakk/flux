@@ -3,9 +3,9 @@ package http_test
 import (
 	"testing"
 
-	"github.com/influxdata/flux/interpreter"
-	"github.com/influxdata/flux/stdlib/http"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux/interpreter"
+	"github.com/gusakk/flux/stdlib/http"
+	"github.com/gusakk/flux/values"
 )
 
 func TestBasicAuth(t *testing.T) {

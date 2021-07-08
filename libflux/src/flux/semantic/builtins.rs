@@ -31,7 +31,7 @@ pub fn builtins() -> Builtins<'static> {
         pkgs: hashmap! {
             "csv" => maplit::hashmap! {
                 // This is a "provide exactly one argument" function
-                // https://github.com/influxdata/flux/issues/2249
+                // https://github.com/gusakk/flux/issues/2249
                 "from" => "forall [t0] where t0: Row (?csv: string, ?file: string) -> [t0]",
             },
             "date" => maplit::hashmap! {
@@ -99,7 +99,7 @@ pub fn builtins() -> Builtins<'static> {
                  // must specify exactly one of bucket, bucketID
                  // must specify exactly one of org, orgID
                  // if host is specified, token must be too.
-                 // https://github.com/influxdata/flux/issues/1660
+                 // https://github.com/gusakk/flux/issues/1660
                  "to" => "forall [t0] where t0: Row (<-tables: [t0], ?bucket: string, ?bucketID: string, ?org: string, ?orgID: string, ?host: string, ?token: string) -> [t0]",
                  "join" => "forall [t0, t1, t2] where t0: Row, t1: Row, t2: Row (left: [t0], right: [t1], fn: (left: t0, right: t1) -> t2) -> [t2]",
             },
@@ -115,7 +115,7 @@ pub fn builtins() -> Builtins<'static> {
             },
             "influxdata/influxdb/v1" => maplit::hashmap! {
                 // exactly one of json and file must be specified
-                // https://github.com/influxdata/flux/issues/2250
+                // https://github.com/gusakk/flux/issues/2250
                 "json" => "forall [t0] where t0: Row (?json: string, ?file: string) -> [t0]",
                 "databases" => r#"
                     forall [] () -> [{
@@ -130,11 +130,11 @@ pub fn builtins() -> Builtins<'static> {
             },
             "influxdata/influxdb" => maplit::hashmap! {
                 // This is a one-or-the-other parameters function
-                // https://github.com/influxdata/flux/issues/1659
+                // https://github.com/gusakk/flux/issues/1659
                 "from" => "forall [t0, t1] (?bucket: string, ?bucketID: string) -> [{_measurement: string | _field: string | _time: time | _value: t0 | t1}]",
                 // exactly one of (bucket, bucketID) must be specified
                 // exactly one of (org, orgID) must be specified
-                // https://github.com/influxdata/flux/issues/1660
+                // https://github.com/gusakk/flux/issues/1660
                 "to" => r#"
                     forall [t0, t1] where t0: Row, t1: Row (
                         <-tables: [t0],
@@ -547,7 +547,7 @@ pub fn builtins() -> Builtins<'static> {
                 "#,
                 // This function would almost have input/output types that match, but:
                 // input column may start as int, uint or float, and always ends up as float.
-                // https://github.com/influxdata/flux/issues/2252
+                // https://github.com/gusakk/flux/issues/2252
                 "kaufmansAMA" => r#"
                     forall [t0, t1] where t0: Row, t1: Row (
                         <-tables: [t0],
@@ -556,7 +556,7 @@ pub fn builtins() -> Builtins<'static> {
                     ) -> [t1]
                 "#,
                 // either column list or predicate must be provided
-                // https://github.com/influxdata/flux/issues/2248
+                // https://github.com/gusakk/flux/issues/2248
                 "keep" => r#"
                     forall [t0, t1] where t0: Row, t1: Row (
                         <-tables: [t0],
@@ -596,7 +596,7 @@ pub fn builtins() -> Builtins<'static> {
                     ) -> [float]
                 "#,
                 // Note: mergeKey parameter could be removed from map once the transpiler is updated:
-                // https://github.com/influxdata/flux/issues/816
+                // https://github.com/gusakk/flux/issues/816
                 "map" => "forall [t0, t1] (<-tables: [t0], fn: (r: t0) -> t1, ?mergeKey: bool) -> [t1]",
                 "max" => "forall [t0] where t0: Row (<-tables: [t0], ?column: string) -> [t0]",
                 "mean" => r#"
@@ -631,9 +631,9 @@ pub fn builtins() -> Builtins<'static> {
                     ) -> [t0]
                 "#,
                 // start and stop should be able to constrained to time or duration with a kind constraint:
-                //   https://github.com/influxdata/flux/issues/2243
+                //   https://github.com/gusakk/flux/issues/2243
                 // Also, we should remove the column arguments so we can reuse t0 in the return type:
-                //   https://github.com/influxdata/flux/issues/2253
+                //   https://github.com/gusakk/flux/issues/2253
                 "range" => r#"
                     forall [t0, t1, t2, t3] where t0: Row, t3: Row (
                         <-tables: [t0],
@@ -645,7 +645,7 @@ pub fn builtins() -> Builtins<'static> {
                     ) -> [t3]
                 "#,
                 // This function could be updated to get better type inference:
-                //   https://github.com/influxdata/flux/issues/2254
+                //   https://github.com/gusakk/flux/issues/2254
                 "reduce" => r#"
                     forall [t0, t1, t2] where t0: Row, t1: Row, t2: Row (
                         <-tables: [t0],
@@ -661,7 +661,7 @@ pub fn builtins() -> Builtins<'static> {
                     ) -> [t1]
                 "#,
                 // Either fn or columns should be specified
-                // https://github.com/influxdata/flux/issues/2251
+                // https://github.com/gusakk/flux/issues/2251
                 "rename" => r#"
                     forall [t0, t1, t2] where t0: Row, t1: Row, t2: Row (
                         <-tables: [t0],
@@ -777,7 +777,7 @@ pub fn builtins() -> Builtins<'static> {
                 // This would produce an output the same as the input,
                 // except that startColumn and stopColumn will be added if they don't
                 // already exist.
-                // https://github.com/influxdata/flux/issues/2255
+                // https://github.com/gusakk/flux/issues/2255
                 "window" => r#"
                     forall [t0, t1] where t0: Row, t1: Row (
                         <-tables: [t0],

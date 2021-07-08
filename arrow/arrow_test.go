@@ -7,7 +7,7 @@ import (
 	"github.com/apache/arrow/go/arrow/math"
 	arrowmemory "github.com/apache/arrow/go/arrow/memory"
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/flux/arrow"
+	"github.com/gusakk/flux/arrow"
 )
 
 func TestSum_Float64_Empty(t *testing.T) {

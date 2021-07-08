@@ -2,7 +2,7 @@ package arrow
 
 import (
 	"github.com/apache/arrow/go/arrow/array"
-	"github.com/influxdata/flux/memory"
+	"github.com/gusakk/flux/memory"
 )
 
 func NewUint(vs []uint64, alloc *memory.Allocator) *array.Uint64 {

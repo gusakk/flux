@@ -1,8 +1,8 @@
 package semantic
 
 import (
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
 )
 
 func runChecks(n Node, vars, opts map[string]bool) error {

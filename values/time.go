@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
-	"github.com/influxdata/flux/parser"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
+	"github.com/gusakk/flux/parser"
 )
 
 type Time int64

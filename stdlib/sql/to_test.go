@@ -6,17 +6,17 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/influxdata/flux"
-	_ "github.com/influxdata/flux/builtin" // We need to import the builtins for the tests to work.
-	"github.com/influxdata/flux/dependencies/dependenciestest"
-	"github.com/influxdata/flux/dependencies/url"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/execute/executetest"
-	"github.com/influxdata/flux/plan"
-	"github.com/influxdata/flux/querytest"
-	"github.com/influxdata/flux/stdlib/influxdata/influxdb"
-	fsql "github.com/influxdata/flux/stdlib/sql"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux"
+	_ "github.com/gusakk/flux/builtin" // We need to import the builtins for the tests to work.
+	"github.com/gusakk/flux/dependencies/dependenciestest"
+	"github.com/gusakk/flux/dependencies/url"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/execute/executetest"
+	"github.com/gusakk/flux/plan"
+	"github.com/gusakk/flux/querytest"
+	"github.com/gusakk/flux/stdlib/influxdata/influxdb"
+	fsql "github.com/gusakk/flux/stdlib/sql"
+	"github.com/gusakk/flux/values"
 	_ "github.com/mattn/go-sqlite3"
 )
 

@@ -3,10 +3,10 @@ package v1_test
 import (
 	"testing"
 
-	"github.com/influxdata/flux"
-	_ "github.com/influxdata/flux/builtin" // We need to import the builtins for the tests to work.
-	"github.com/influxdata/flux/querytest"
-	"github.com/influxdata/flux/stdlib/influxdata/influxdb/v1"
+	"github.com/gusakk/flux"
+	_ "github.com/gusakk/flux/builtin" // We need to import the builtins for the tests to work.
+	"github.com/gusakk/flux/querytest"
+	"github.com/gusakk/flux/stdlib/influxdata/influxdb/v1"
 )
 
 func TestFromInfluxJSON_NewQuery(t *testing.T) {

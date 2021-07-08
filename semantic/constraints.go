@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/influxdata/flux/ast"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/internal/errors"
+	"github.com/gusakk/flux/ast"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/internal/errors"
 )
 
 // GenerateConstraints walks the graph and generates constraints between type vairables provided in the annotations.

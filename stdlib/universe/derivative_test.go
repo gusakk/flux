@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/flux"
-	"github.com/influxdata/flux/codes"
-	"github.com/influxdata/flux/execute"
-	"github.com/influxdata/flux/execute/executetest"
-	"github.com/influxdata/flux/internal/errors"
-	"github.com/influxdata/flux/querytest"
-	"github.com/influxdata/flux/stdlib/universe"
+	"github.com/gusakk/flux"
+	"github.com/gusakk/flux/codes"
+	"github.com/gusakk/flux/execute"
+	"github.com/gusakk/flux/execute/executetest"
+	"github.com/gusakk/flux/internal/errors"
+	"github.com/gusakk/flux/querytest"
+	"github.com/gusakk/flux/stdlib/universe"
 )
 
 func TestDerivativeOperation_Marshaling(t *testing.T) {

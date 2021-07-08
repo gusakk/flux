@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/influxdata/flux/ast"
+	"github.com/gusakk/flux/ast"
 )
 
 func TestOptionDeclarations(t *testing.T) {
@@ -941,7 +941,7 @@ func TestVarReAssignments(t *testing.T) {
 			// }
 			//
 			name: "reassign parameter",
-			skip: "reassigning a param inside a function's body should error (https://github.com/influxdata/flux/issues/857)",
+			skip: "reassigning a param inside a function's body should error (https://github.com/gusakk/flux/issues/857)",
 			pkg: &Package{
 				Package: "foo",
 				Files: []*File{

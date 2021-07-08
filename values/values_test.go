@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/influxdata/flux/semantic"
-	"github.com/influxdata/flux/values"
+	"github.com/gusakk/flux/semantic"
+	"github.com/gusakk/flux/values"
 )
 
 func TestNew(t *testing.T) {

@@ -1,7 +1,7 @@
 package plan
 
 import (
-	"github.com/influxdata/flux"
+	"github.com/gusakk/flux"
 )
 
 // PlannerBuilder provides clients with an easy way to create planners.
