@@ -2,7 +2,7 @@ version: 2
 jobs:
   test:
     docker:
-      - image: quay.io/influxdb/flux-build:latest
+      - image: quay.io/gusakk/flux-build:latest
     environment:
       GOCACHE: /tmp/go-cache
       GOFLAGS: -p=8
@@ -61,7 +61,7 @@ jobs:
           when: always
   test-race:
     docker:
-      - image: quay.io/influxdb/flux-build:latest
+      - image: quay.io/gusakk/flux-build:latest
     environment:
       GOPATH: /tmp/go
       GOFLAGS: -p=8
@@ -79,7 +79,7 @@ jobs:
       # No need to save the pkg/mod cache since the other job does it
   test-bench:
     docker:
-      - image: quay.io/influxdb/flux-build:latest
+      - image: quay.io/gusakk/flux-build:latest
     environment:
       GOPATH: /tmp/go
       GOFLAGS: -p=8
@@ -95,14 +95,14 @@ jobs:
       # No need to save the pkg/mod cache since the other job does it
   test-valgrind:
     docker:
-      - image: quay.io/influxdb/flux-build:latest
+      - image: quay.io/gusakk/flux-build:latest
     steps:
       - checkout
       - run: make test-valgrind
 
   release:
     docker:
-      - image: quay.io/influxdb/flux-build:latest
+      - image: circleci/golang:1.12
     environment:
       GOCACHE: /tmp/go-cache
       GOFLAGS: -p=8
