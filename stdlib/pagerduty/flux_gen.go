@@ -24,30 +24,30 @@ var pkgAST = &ast.Package{
 			Loc: &ast.SourceLocation{
 				End: ast.Position{
 					Column: 6,
-					Line:   117,
+					Line:   232,
 				},
 				File:   "pagerduty.flux",
-				Source: "package pagerduty\n\n\nimport \"http\"\nimport \"json\"\nimport \"strings\"\n\n// `dedupKey` - adds a newline concatinated value of the sorted group key that is then sha256-hashed and hex-encoded to a column with the key `_pagerdutyDedupKey`.\nbuiltin dedupKey : (<-tables: [A]) => [{A with _pagerdutyDedupKey: string}]\n\noption defaultURL = \"https://events.pagerduty.com/v2/enqueue\"\n\n// severity levels on status objects can be one of the following: ok,info,warn,crit,unknown\n// but pagerduty only accepts critical, error, warning or info.\n// severityFromLevel turns a level from the status object into a pagerduty severity\nseverityFromLevel = (level) => {\n    lvl = strings.toLower(v: level)\n    sev = if lvl == \"warn\" then\n        \"warning\"\n    else if lvl == \"crit\" then\n        \"critical\"\n    else if lvl == \"info\" then\n        \"info\"\n    else if lvl == \"ok\" then\n        \"info\"\n    else\n        \"error\"\n\n    return sev\n}\n\n// `actionFromLevel` converts a monitoring level to an action; \"ok\" becomes \"resolve\" everything else converts to \"trigger\".\nactionFromLevel = (level) => if strings.toLower(v: level) == \"ok\" then \"resolve\" else \"trigger\"\n\n// `sendEvent` sends an event to PagerDuty, the description of some of these parameters taken from the pagerduty documentation at https://v2.developer.pagerduty.com/docs/send-an-event-events-api-v2\n// `pagerdutyURL` - sring - URL of the pagerduty endpoint.  Defaults to: `option defaultURL = \"https://events.pagerduty.com/v2/enqueue\"`\n// `routingKey` - string - routingKey.\n// `client` - string - name of the client sending the alert.\n// `clientURL` - string - url of the client sending the alert.\n// `dedupkey` - string - a per alert ID. It acts as deduplication key, that allows you to ack or change the severity of previous messages. Supports a maximum of 255 characters.\n// `class` - string - The class/type of the event, for example ping failure or cpu load.\n// `group` - string - Logical grouping of components of a service, for example app-stack.\n// `severity` - string - The perceived severity of the status the event is describing with respect to the affected system. This can be critical, error, warning or info.\n// `eventAction` - string - The type of event to send to PagerDuty (ex. trigger, resolve, acknowledge)\n// `source` - string - The unique location of the affected system, preferably a hostname or FQDN.\n// `summary` - string - A brief text summary of the event, used to generate the summaries/titles of any associated alerts. The maximum permitted length of this property is 1024 characters.\n// `timestamp` - string - The time at which the emitting tool detected or generated the event, in RFC 3339 nano format.\nsendEvent = (\n        pagerdutyURL=defaultURL,\n        routingKey,\n        client,\n        clientURL,\n        dedupKey,\n        class,\n        group,\n        severity,\n        eventAction,\n        source,\n        summary,\n        timestamp,\n) => {\n    payload = {\n        summary: summary,\n        timestamp: timestamp,\n        source: source,\n        severity: severity,\n        group: group,\n        class: class,\n    }\n    data = {\n        payload: payload,\n        routing_key: routingKey,\n        dedup_key: dedupKey,\n        event_action: eventAction,\n        client: client,\n        client_url: clientURL,\n    }\n    headers = {\n        \"Accept\": \"application/vnd.pagerduty+json;version=2\",\n        \"Content-Type\": \"application/json\",\n    }\n    enc = json.encode(v: data)\n\n    return http.post(headers: headers, url: pagerdutyURL, data: enc)\n}\n\n// `endpoint` creates the endpoint for the PagerDuty external service.\n// `url` - string - URL of the Pagerduty endpoint. Defaults to: \"https://events.pagerduty.com/v2/enqueue\".\n// The returned factory function accepts a `mapFn` parameter.\n// The `mapFn` parameter must be a function that returns an object with `routingKey`, `client`, `client_url`, `class`, `group`, `severity`, `eventAction`, `source`, `summary`, and `timestamp` as defined in the sendEvent function.\n// Note that while sendEvent accepts a dedup key, endpoint gets the dedupkey from the groupkey of the input table instead of it being handled by the `mapFn`.\nendpoint = (url=defaultURL) => (mapFn) => (tables=<-) => tables\n    |> dedupKey()\n    |> map(\n        fn: (r) => {\n            obj = mapFn(r: r)\n\n            return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }\n        },\n    )",
+				Source: "package pagerduty\n\n\nimport \"http\"\nimport \"json\"\nimport \"strings\"\n\n// dedupKey uses the group key of an input table to generate and store a deduplication key in the _pagerdutyDedupKey column.\n// The function sorts, newline-concatenates, SHA256-hashes, and hex-encodes the group key to create a unique deduplication key for each input table.\n//\n// ## Parameters\n// - `exclude` is the group key columns to exclude when generating the deduplication key. Default is [\"_start\", \"_stop\", \"_level\"].\n//\n// ## Add a PagerDuty deduplication key to output data\n// ```\n// import \"pagerduty\"\n//\n// from(bucket: \"default\")\n//   |> range(start: -5m)\n//   |> filter(fn: (r) => r._measurement == \"mem\")\n//   |> pagerduty.dedupKey()\n// ```\n//\nbuiltin dedupKey : (<-tables: [A], ?exclude: [string]) => [{A with _pagerdutyDedupKey: string}]\n\noption defaultURL = \"https://events.pagerduty.com/v2/enqueue\"\n\n// severityFromLevel converts an InfluxDB status level to a PagerDuty severity.\n//\n//\n//  Status level\tPagerDuty severity\n//  crit\t        critical\n//  warn\t        warning\n//  info\t        info\n//  ok\t            info\n//\n// ## Parameters\n// - `level` is the InfluxDB status level to convert to a PagerDuty severity.\n//\nseverityFromLevel = (level) => {\n    lvl = strings.toLower(v: level)\n    sev = if lvl == \"warn\" then\n        \"warning\"\n    else if lvl == \"crit\" then\n        \"critical\"\n    else if lvl == \"info\" then\n        \"info\"\n    else if lvl == \"ok\" then\n        \"info\"\n    else\n        \"error\"\n\n    return sev\n}\n\n// actionFromSeverity converts a severity to a PagerDuty action. ok converts to resolve. All other severities convert to trigger.\n//\n// ## Parameters\n// - `severity` is the severity to convert to a PagerDuty action.\n//\nactionFromSeverity = (severity) => if strings.toLower(v: severity) == \"ok\" then\n    \"resolve\"\nelse\n    \"trigger\"\n\n// `actionFromLevel` converts a monitoring level to an action; \"ok\" becomes \"resolve\" everything else converts to \"trigger\".\nactionFromLevel = (level) => if strings.toLower(v: level) == \"ok\" then \"resolve\" else \"trigger\"\n\n// sendEvent sends an event to PagerDuty.\n//\n// ## Parameters\n// - `pagerdutyURL` is the URL of the PagerDuty endpoint.\n//\n//      Defaults to https://events.page rduty.com/v2/enqueue.\n//\n// - `routingKey` is the routing key generated from your PagerDuty integration.\n// - `client` is the name of the client sending the alert.\n// - `clientURL` is the URL of the client sending the alert.\n// - `dedupkey` is a per-alert ID that acts as deduplication key and allows you to acknowledge or change the severity of previous messages. Supports a maximum of 255 characters.\n// - `class` is the class or type of the event.\n//\n//      Classes are user-defined.\n//      For example, ping failure or cpu load.\n//\n// - `group` is a logical grouping used by PagerDuty.\n//\n//      Groups are user-defined.\n//      For example, app-stack.\n//\n// - `severity` is the severity of the event.\n//\n//      Valid values include:\n//\n//        critical\n//        error\n//        warning\n//        info\n//\n// - `eventAction` is the event type to send to PagerDuty.\n//\n//      Valid values include:\n//\n//        trigger\n//        resolve\n//        acknowledge\n//\n// - `source` is the unique location of the affected system. For example, the hostname or fully qualified domain name (FQDN).\n// - `summary` is a brief text summary of the event used as the summaries or titles of associated alerts. The maximum permitted length is 1024 characters.\n// - `timestamp` is the time the detected event occurred in RFC3339nano format.\n//\nsendEvent = (\n        pagerdutyURL=defaultURL,\n        routingKey,\n        client,\n        clientURL,\n        dedupKey,\n        class,\n        group,\n        severity,\n        eventAction,\n        source,\n        summary,\n        timestamp,\n) => {\n    payload = {\n        summary: summary,\n        timestamp: timestamp,\n        source: source,\n        severity: severity,\n        group: group,\n        class: class,\n    }\n    data = {\n        payload: payload,\n        routing_key: routingKey,\n        dedup_key: dedupKey,\n        event_action: eventAction,\n        client: client,\n        client_url: clientURL,\n    }\n    headers = {\n        \"Accept\": \"application/vnd.pagerduty+json;version=2\",\n        \"Content-Type\": \"application/json\",\n    }\n    enc = json.encode(v: data)\n\n    return http.post(headers: headers, url: pagerdutyURL, data: enc)\n}\n\n// endpoint returns a function that can be used to send a message to PagerDuty that includes output data.\n//\n// ## Parameters\n// - `url` is the The PagerDuty v2 Events API URL.\n//\n//      Defaults to https://events.pagerduty.com/v2/enqueue.\n//\n// - `Usage` the pagerduty.endpoint is a factory function that outputs another function.\n//\n//      The output function requires a mapFn parameter.\n//      See the PagerDuty v2 Events API documentation for more information about these parameters.\n//\n// - `mapFn` is a function that builds the record used to generate the POST request. Requires an r parameter.\n//\n//      mapFn accepts a table row (r) and returns a record that must include the following fields:\n//         routingKey\n//         client\n//         client_url\n//         class\n//         eventAction\n//         group\n//         severity\n//         component\n//         source\n//         summary\n//         timestamp\n//\n// ## Send critical statuses to a PagerDuty endpoint\n// ```\n// import \"pagerduty\"\n// import \"influxdata/influxdb/secrets\"\n//\n// routingKey = secrets.get(key: \"PAGERDUTY_ROUTING_KEY\")\n// toPagerDuty = pagerduty.endpoint()\n//\n// crit_statuses = from(bucket: \"example-bucket\")\n//   |> range(start: -1m)\n//   |> filter(fn: (r) => r._measurement == \"statuses\" and r.status == \"crit\")\n//\n// crit_statuses\n//   |> toPagerDuty(mapFn: (r) => ({ r with\n//       routingKey: routingKey,\n//       client: r.client,\n//       clientURL: r.clientURL,\n//       class: r.class,\n//       eventAction: r.eventAction,\n//       group: r.group,\n//       severity: r.severity,\n//       component: r.component,\n//       source: r.source,\n//       summary: r.summary,\n//       timestamp: r._time,\n//     })\n//   )()\n// ```\n//\nendpoint = (url=defaultURL) => (mapFn) => (tables=<-) => tables\n    |> dedupKey()\n    |> map(\n        fn: (r) => {\n            obj = mapFn(r: r)\n\n            return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }\n        },\n    )",
 				Start: ast.Position{
 					Column: 1,
-					Line:   1,
+					Line:   2,
 				},
 			},
 		},
 		Body: []ast.Statement{&ast.BuiltinStatement{
 			BaseNode: ast.BaseNode{
-				Comments: []ast.Comment{ast.Comment{Text: "// `dedupKey` - adds a newline concatinated value of the sorted group key that is then sha256-hashed and hex-encoded to a column with the key `_pagerdutyDedupKey`.\n"}},
+				Comments: []ast.Comment{ast.Comment{Text: "// dedupKey uses the group key of an input table to generate and store a deduplication key in the _pagerdutyDedupKey column.\n"}, ast.Comment{Text: "// The function sorts, newline-concatenates, SHA256-hashes, and hex-encodes the group key to create a unique deduplication key for each input table.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// ## Parameters\n"}, ast.Comment{Text: "// - `exclude` is the group key columns to exclude when generating the deduplication key. Default is [\"_start\", \"_stop\", \"_level\"].\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// ## Add a PagerDuty deduplication key to output data\n"}, ast.Comment{Text: "// ```\n"}, ast.Comment{Text: "// import \"pagerduty\"\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// from(bucket: \"default\")\n"}, ast.Comment{Text: "//   |> range(start: -5m)\n"}, ast.Comment{Text: "//   |> filter(fn: (r) => r._measurement == \"mem\")\n"}, ast.Comment{Text: "//   |> pagerduty.dedupKey()\n"}, ast.Comment{Text: "// ```\n"}, ast.Comment{Text: "//\n"}},
 				Errors:   nil,
 				Loc: &ast.SourceLocation{
 					End: ast.Position{
 						Column: 17,
-						Line:   9,
+						Line:   25,
 					},
 					File:   "pagerduty.flux",
 					Source: "builtin dedupKey",
 					Start: ast.Position{
 						Column: 1,
-						Line:   9,
+						Line:   25,
 					},
 				},
 			},
@@ -59,13 +59,13 @@ var pkgAST = &ast.Package{
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 17,
-							Line:   9,
+							Line:   25,
 						},
 						File:   "pagerduty.flux",
 						Source: "dedupKey",
 						Start: ast.Position{
 							Column: 9,
-							Line:   9,
+							Line:   25,
 						},
 					},
 				},
@@ -77,14 +77,14 @@ var pkgAST = &ast.Package{
 					Errors:   nil,
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
-							Column: 76,
-							Line:   9,
+							Column: 96,
+							Line:   25,
 						},
 						File:   "pagerduty.flux",
-						Source: "(<-tables: [A]) => [{A with _pagerdutyDedupKey: string}]",
+						Source: "(<-tables: [A], ?exclude: [string]) => [{A with _pagerdutyDedupKey: string}]",
 						Start: ast.Position{
 							Column: 20,
-							Line:   9,
+							Line:   25,
 						},
 					},
 				},
@@ -95,14 +95,14 @@ var pkgAST = &ast.Package{
 						Errors:   nil,
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
-								Column: 76,
-								Line:   9,
+								Column: 96,
+								Line:   25,
 							},
 							File:   "pagerduty.flux",
-							Source: "(<-tables: [A]) => [{A with _pagerdutyDedupKey: string}]",
+							Source: "(<-tables: [A], ?exclude: [string]) => [{A with _pagerdutyDedupKey: string}]",
 							Start: ast.Position{
 								Column: 20,
-								Line:   9,
+								Line:   25,
 							},
 						},
 					},
@@ -113,13 +113,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 34,
-									Line:   9,
+									Line:   25,
 								},
 								File:   "pagerduty.flux",
 								Source: "<-tables: [A]",
 								Start: ast.Position{
 									Column: 21,
-									Line:   9,
+									Line:   25,
 								},
 							},
 						},
@@ -131,13 +131,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 29,
-										Line:   9,
+										Line:   25,
 									},
 									File:   "pagerduty.flux",
 									Source: "tables",
 									Start: ast.Position{
 										Column: 23,
-										Line:   9,
+										Line:   25,
 									},
 								},
 							},
@@ -150,13 +150,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 34,
-										Line:   9,
+										Line:   25,
 									},
 									File:   "pagerduty.flux",
 									Source: "[A]",
 									Start: ast.Position{
 										Column: 31,
-										Line:   9,
+										Line:   25,
 									},
 								},
 							},
@@ -167,13 +167,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 33,
-											Line:   9,
+											Line:   25,
 										},
 										File:   "pagerduty.flux",
 										Source: "A",
 										Start: ast.Position{
 											Column: 32,
-											Line:   9,
+											Line:   25,
 										},
 									},
 								},
@@ -184,17 +184,109 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 33,
-												Line:   9,
+												Line:   25,
 											},
 											File:   "pagerduty.flux",
 											Source: "A",
 											Start: ast.Position{
 												Column: 32,
-												Line:   9,
+												Line:   25,
 											},
 										},
 									},
 									Name: "A",
+								},
+							},
+						},
+					}, &ast.ParameterType{
+						BaseNode: ast.BaseNode{
+							Comments: nil,
+							Errors:   nil,
+							Loc: &ast.SourceLocation{
+								End: ast.Position{
+									Column: 54,
+									Line:   25,
+								},
+								File:   "pagerduty.flux",
+								Source: "?exclude: [string]",
+								Start: ast.Position{
+									Column: 36,
+									Line:   25,
+								},
+							},
+						},
+						Kind: "Optional",
+						Name: &ast.Identifier{
+							BaseNode: ast.BaseNode{
+								Comments: nil,
+								Errors:   nil,
+								Loc: &ast.SourceLocation{
+									End: ast.Position{
+										Column: 44,
+										Line:   25,
+									},
+									File:   "pagerduty.flux",
+									Source: "exclude",
+									Start: ast.Position{
+										Column: 37,
+										Line:   25,
+									},
+								},
+							},
+							Name: "exclude",
+						},
+						Ty: &ast.ArrayType{
+							BaseNode: ast.BaseNode{
+								Comments: nil,
+								Errors:   nil,
+								Loc: &ast.SourceLocation{
+									End: ast.Position{
+										Column: 54,
+										Line:   25,
+									},
+									File:   "pagerduty.flux",
+									Source: "[string]",
+									Start: ast.Position{
+										Column: 46,
+										Line:   25,
+									},
+								},
+							},
+							ElementType: &ast.NamedType{
+								BaseNode: ast.BaseNode{
+									Comments: nil,
+									Errors:   nil,
+									Loc: &ast.SourceLocation{
+										End: ast.Position{
+											Column: 53,
+											Line:   25,
+										},
+										File:   "pagerduty.flux",
+										Source: "string",
+										Start: ast.Position{
+											Column: 47,
+											Line:   25,
+										},
+									},
+								},
+								ID: &ast.Identifier{
+									BaseNode: ast.BaseNode{
+										Comments: nil,
+										Errors:   nil,
+										Loc: &ast.SourceLocation{
+											End: ast.Position{
+												Column: 53,
+												Line:   25,
+											},
+											File:   "pagerduty.flux",
+											Source: "string",
+											Start: ast.Position{
+												Column: 47,
+												Line:   25,
+											},
+										},
+									},
+									Name: "string",
 								},
 							},
 						},
@@ -205,14 +297,14 @@ var pkgAST = &ast.Package{
 							Errors:   nil,
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
-									Column: 76,
-									Line:   9,
+									Column: 96,
+									Line:   25,
 								},
 								File:   "pagerduty.flux",
 								Source: "[{A with _pagerdutyDedupKey: string}]",
 								Start: ast.Position{
-									Column: 39,
-									Line:   9,
+									Column: 59,
+									Line:   25,
 								},
 							},
 						},
@@ -222,14 +314,14 @@ var pkgAST = &ast.Package{
 								Errors:   nil,
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
-										Column: 75,
-										Line:   9,
+										Column: 95,
+										Line:   25,
 									},
 									File:   "pagerduty.flux",
 									Source: "{A with _pagerdutyDedupKey: string}",
 									Start: ast.Position{
-										Column: 40,
-										Line:   9,
+										Column: 60,
+										Line:   25,
 									},
 								},
 							},
@@ -239,14 +331,14 @@ var pkgAST = &ast.Package{
 									Errors:   nil,
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
-											Column: 74,
-											Line:   9,
+											Column: 94,
+											Line:   25,
 										},
 										File:   "pagerduty.flux",
 										Source: "_pagerdutyDedupKey: string",
 										Start: ast.Position{
-											Column: 48,
-											Line:   9,
+											Column: 68,
+											Line:   25,
 										},
 									},
 								},
@@ -256,14 +348,14 @@ var pkgAST = &ast.Package{
 										Errors:   nil,
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
-												Column: 66,
-												Line:   9,
+												Column: 86,
+												Line:   25,
 											},
 											File:   "pagerduty.flux",
 											Source: "_pagerdutyDedupKey",
 											Start: ast.Position{
-												Column: 48,
-												Line:   9,
+												Column: 68,
+												Line:   25,
 											},
 										},
 									},
@@ -275,14 +367,14 @@ var pkgAST = &ast.Package{
 										Errors:   nil,
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
-												Column: 74,
-												Line:   9,
+												Column: 94,
+												Line:   25,
 											},
 											File:   "pagerduty.flux",
 											Source: "string",
 											Start: ast.Position{
-												Column: 68,
-												Line:   9,
+												Column: 88,
+												Line:   25,
 											},
 										},
 									},
@@ -292,14 +384,14 @@ var pkgAST = &ast.Package{
 											Errors:   nil,
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
-													Column: 74,
-													Line:   9,
+													Column: 94,
+													Line:   25,
 												},
 												File:   "pagerduty.flux",
 												Source: "string",
 												Start: ast.Position{
-													Column: 68,
-													Line:   9,
+													Column: 88,
+													Line:   25,
 												},
 											},
 										},
@@ -313,14 +405,14 @@ var pkgAST = &ast.Package{
 									Errors:   nil,
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
-											Column: 42,
-											Line:   9,
+											Column: 62,
+											Line:   25,
 										},
 										File:   "pagerduty.flux",
 										Source: "A",
 										Start: ast.Position{
-											Column: 41,
-											Line:   9,
+											Column: 61,
+											Line:   25,
 										},
 									},
 								},
@@ -338,13 +430,13 @@ var pkgAST = &ast.Package{
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 62,
-							Line:   11,
+							Line:   27,
 						},
 						File:   "pagerduty.flux",
 						Source: "defaultURL = \"https://events.pagerduty.com/v2/enqueue\"",
 						Start: ast.Position{
 							Column: 8,
-							Line:   11,
+							Line:   27,
 						},
 					},
 				},
@@ -355,13 +447,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 18,
-								Line:   11,
+								Line:   27,
 							},
 							File:   "pagerduty.flux",
 							Source: "defaultURL",
 							Start: ast.Position{
 								Column: 8,
-								Line:   11,
+								Line:   27,
 							},
 						},
 					},
@@ -374,13 +466,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 62,
-								Line:   11,
+								Line:   27,
 							},
 							File:   "pagerduty.flux",
 							Source: "\"https://events.pagerduty.com/v2/enqueue\"",
 							Start: ast.Position{
 								Column: 21,
-								Line:   11,
+								Line:   27,
 							},
 						},
 					},
@@ -393,13 +485,13 @@ var pkgAST = &ast.Package{
 				Loc: &ast.SourceLocation{
 					End: ast.Position{
 						Column: 62,
-						Line:   11,
+						Line:   27,
 					},
 					File:   "pagerduty.flux",
 					Source: "option defaultURL = \"https://events.pagerduty.com/v2/enqueue\"",
 					Start: ast.Position{
 						Column: 1,
-						Line:   11,
+						Line:   27,
 					},
 				},
 			},
@@ -410,30 +502,30 @@ var pkgAST = &ast.Package{
 				Loc: &ast.SourceLocation{
 					End: ast.Position{
 						Column: 2,
-						Line:   30,
+						Line:   55,
 					},
 					File:   "pagerduty.flux",
 					Source: "severityFromLevel = (level) => {\n    lvl = strings.toLower(v: level)\n    sev = if lvl == \"warn\" then\n        \"warning\"\n    else if lvl == \"crit\" then\n        \"critical\"\n    else if lvl == \"info\" then\n        \"info\"\n    else if lvl == \"ok\" then\n        \"info\"\n    else\n        \"error\"\n\n    return sev\n}",
 					Start: ast.Position{
 						Column: 1,
-						Line:   16,
+						Line:   41,
 					},
 				},
 			},
 			ID: &ast.Identifier{
 				BaseNode: ast.BaseNode{
-					Comments: []ast.Comment{ast.Comment{Text: "// severity levels on status objects can be one of the following: ok,info,warn,crit,unknown\n"}, ast.Comment{Text: "// but pagerduty only accepts critical, error, warning or info.\n"}, ast.Comment{Text: "// severityFromLevel turns a level from the status object into a pagerduty severity\n"}},
+					Comments: []ast.Comment{ast.Comment{Text: "// severityFromLevel converts an InfluxDB status level to a PagerDuty severity.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "//  Status level\tPagerDuty severity\n"}, ast.Comment{Text: "//  crit\t        critical\n"}, ast.Comment{Text: "//  warn\t        warning\n"}, ast.Comment{Text: "//  info\t        info\n"}, ast.Comment{Text: "//  ok\t            info\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// ## Parameters\n"}, ast.Comment{Text: "// - `level` is the InfluxDB status level to convert to a PagerDuty severity.\n"}, ast.Comment{Text: "//\n"}},
 					Errors:   nil,
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 18,
-							Line:   16,
+							Line:   41,
 						},
 						File:   "pagerduty.flux",
 						Source: "severityFromLevel",
 						Start: ast.Position{
 							Column: 1,
-							Line:   16,
+							Line:   41,
 						},
 					},
 				},
@@ -447,13 +539,13 @@ var pkgAST = &ast.Package{
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 2,
-							Line:   30,
+							Line:   55,
 						},
 						File:   "pagerduty.flux",
 						Source: "(level) => {\n    lvl = strings.toLower(v: level)\n    sev = if lvl == \"warn\" then\n        \"warning\"\n    else if lvl == \"crit\" then\n        \"critical\"\n    else if lvl == \"info\" then\n        \"info\"\n    else if lvl == \"ok\" then\n        \"info\"\n    else\n        \"error\"\n\n    return sev\n}",
 						Start: ast.Position{
 							Column: 21,
-							Line:   16,
+							Line:   41,
 						},
 					},
 				},
@@ -464,13 +556,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 2,
-								Line:   30,
+								Line:   55,
 							},
 							File:   "pagerduty.flux",
 							Source: "{\n    lvl = strings.toLower(v: level)\n    sev = if lvl == \"warn\" then\n        \"warning\"\n    else if lvl == \"crit\" then\n        \"critical\"\n    else if lvl == \"info\" then\n        \"info\"\n    else if lvl == \"ok\" then\n        \"info\"\n    else\n        \"error\"\n\n    return sev\n}",
 							Start: ast.Position{
 								Column: 32,
-								Line:   16,
+								Line:   41,
 							},
 						},
 					},
@@ -481,13 +573,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 36,
-									Line:   17,
+									Line:   42,
 								},
 								File:   "pagerduty.flux",
 								Source: "lvl = strings.toLower(v: level)",
 								Start: ast.Position{
 									Column: 5,
-									Line:   17,
+									Line:   42,
 								},
 							},
 						},
@@ -498,13 +590,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 8,
-										Line:   17,
+										Line:   42,
 									},
 									File:   "pagerduty.flux",
 									Source: "lvl",
 									Start: ast.Position{
 										Column: 5,
-										Line:   17,
+										Line:   42,
 									},
 								},
 							},
@@ -518,13 +610,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 35,
-											Line:   17,
+											Line:   42,
 										},
 										File:   "pagerduty.flux",
 										Source: "v: level",
 										Start: ast.Position{
 											Column: 27,
-											Line:   17,
+											Line:   42,
 										},
 									},
 								},
@@ -536,13 +628,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 35,
-												Line:   17,
+												Line:   42,
 											},
 											File:   "pagerduty.flux",
 											Source: "v: level",
 											Start: ast.Position{
 												Column: 27,
-												Line:   17,
+												Line:   42,
 											},
 										},
 									},
@@ -554,13 +646,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 28,
-													Line:   17,
+													Line:   42,
 												},
 												File:   "pagerduty.flux",
 												Source: "v",
 												Start: ast.Position{
 													Column: 27,
-													Line:   17,
+													Line:   42,
 												},
 											},
 										},
@@ -574,13 +666,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 35,
-													Line:   17,
+													Line:   42,
 												},
 												File:   "pagerduty.flux",
 												Source: "level",
 												Start: ast.Position{
 													Column: 30,
-													Line:   17,
+													Line:   42,
 												},
 											},
 										},
@@ -596,13 +688,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 36,
-										Line:   17,
+										Line:   42,
 									},
 									File:   "pagerduty.flux",
 									Source: "strings.toLower(v: level)",
 									Start: ast.Position{
 										Column: 11,
-										Line:   17,
+										Line:   42,
 									},
 								},
 							},
@@ -613,13 +705,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 26,
-											Line:   17,
+											Line:   42,
 										},
 										File:   "pagerduty.flux",
 										Source: "strings.toLower",
 										Start: ast.Position{
 											Column: 11,
-											Line:   17,
+											Line:   42,
 										},
 									},
 								},
@@ -631,13 +723,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 18,
-												Line:   17,
+												Line:   42,
 											},
 											File:   "pagerduty.flux",
 											Source: "strings",
 											Start: ast.Position{
 												Column: 11,
-												Line:   17,
+												Line:   42,
 											},
 										},
 									},
@@ -650,13 +742,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 26,
-												Line:   17,
+												Line:   42,
 											},
 											File:   "pagerduty.flux",
 											Source: "toLower",
 											Start: ast.Position{
 												Column: 19,
-												Line:   17,
+												Line:   42,
 											},
 										},
 									},
@@ -674,13 +766,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 16,
-									Line:   27,
+									Line:   52,
 								},
 								File:   "pagerduty.flux",
 								Source: "sev = if lvl == \"warn\" then\n        \"warning\"\n    else if lvl == \"crit\" then\n        \"critical\"\n    else if lvl == \"info\" then\n        \"info\"\n    else if lvl == \"ok\" then\n        \"info\"\n    else\n        \"error\"",
 								Start: ast.Position{
 									Column: 5,
-									Line:   18,
+									Line:   43,
 								},
 							},
 						},
@@ -691,13 +783,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 8,
-										Line:   18,
+										Line:   43,
 									},
 									File:   "pagerduty.flux",
 									Source: "sev",
 									Start: ast.Position{
 										Column: 5,
-										Line:   18,
+										Line:   43,
 									},
 								},
 							},
@@ -714,13 +806,13 @@ var pkgAST = &ast.Package{
 												Loc: &ast.SourceLocation{
 													End: ast.Position{
 														Column: 16,
-														Line:   27,
+														Line:   52,
 													},
 													File:   "pagerduty.flux",
 													Source: "\"error\"",
 													Start: ast.Position{
 														Column: 9,
-														Line:   27,
+														Line:   52,
 													},
 												},
 											},
@@ -732,13 +824,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 16,
-													Line:   27,
+													Line:   52,
 												},
 												File:   "pagerduty.flux",
 												Source: "if lvl == \"ok\" then\n        \"info\"\n    else\n        \"error\"",
 												Start: ast.Position{
 													Column: 10,
-													Line:   24,
+													Line:   49,
 												},
 											},
 										},
@@ -749,13 +841,13 @@ var pkgAST = &ast.Package{
 												Loc: &ast.SourceLocation{
 													End: ast.Position{
 														Column: 15,
-														Line:   25,
+														Line:   50,
 													},
 													File:   "pagerduty.flux",
 													Source: "\"info\"",
 													Start: ast.Position{
 														Column: 9,
-														Line:   25,
+														Line:   50,
 													},
 												},
 											},
@@ -768,13 +860,13 @@ var pkgAST = &ast.Package{
 												Loc: &ast.SourceLocation{
 													End: ast.Position{
 														Column: 24,
-														Line:   24,
+														Line:   49,
 													},
 													File:   "pagerduty.flux",
 													Source: "lvl == \"ok\"",
 													Start: ast.Position{
 														Column: 13,
-														Line:   24,
+														Line:   49,
 													},
 												},
 											},
@@ -785,13 +877,13 @@ var pkgAST = &ast.Package{
 													Loc: &ast.SourceLocation{
 														End: ast.Position{
 															Column: 16,
-															Line:   24,
+															Line:   49,
 														},
 														File:   "pagerduty.flux",
 														Source: "lvl",
 														Start: ast.Position{
 															Column: 13,
-															Line:   24,
+															Line:   49,
 														},
 													},
 												},
@@ -805,13 +897,13 @@ var pkgAST = &ast.Package{
 													Loc: &ast.SourceLocation{
 														End: ast.Position{
 															Column: 24,
-															Line:   24,
+															Line:   49,
 														},
 														File:   "pagerduty.flux",
 														Source: "\"ok\"",
 														Start: ast.Position{
 															Column: 20,
-															Line:   24,
+															Line:   49,
 														},
 													},
 												},
@@ -828,13 +920,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 16,
-												Line:   27,
+												Line:   52,
 											},
 											File:   "pagerduty.flux",
 											Source: "if lvl == \"info\" then\n        \"info\"\n    else if lvl == \"ok\" then\n        \"info\"\n    else\n        \"error\"",
 											Start: ast.Position{
 												Column: 10,
-												Line:   22,
+												Line:   47,
 											},
 										},
 									},
@@ -845,13 +937,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 15,
-													Line:   23,
+													Line:   48,
 												},
 												File:   "pagerduty.flux",
 												Source: "\"info\"",
 												Start: ast.Position{
 													Column: 9,
-													Line:   23,
+													Line:   48,
 												},
 											},
 										},
@@ -864,13 +956,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 26,
-													Line:   22,
+													Line:   47,
 												},
 												File:   "pagerduty.flux",
 												Source: "lvl == \"info\"",
 												Start: ast.Position{
 													Column: 13,
-													Line:   22,
+													Line:   47,
 												},
 											},
 										},
@@ -881,13 +973,13 @@ var pkgAST = &ast.Package{
 												Loc: &ast.SourceLocation{
 													End: ast.Position{
 														Column: 16,
-														Line:   22,
+														Line:   47,
 													},
 													File:   "pagerduty.flux",
 													Source: "lvl",
 													Start: ast.Position{
 														Column: 13,
-														Line:   22,
+														Line:   47,
 													},
 												},
 											},
@@ -901,13 +993,13 @@ var pkgAST = &ast.Package{
 												Loc: &ast.SourceLocation{
 													End: ast.Position{
 														Column: 26,
-														Line:   22,
+														Line:   47,
 													},
 													File:   "pagerduty.flux",
 													Source: "\"info\"",
 													Start: ast.Position{
 														Column: 20,
-														Line:   22,
+														Line:   47,
 													},
 												},
 											},
@@ -924,13 +1016,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 16,
-											Line:   27,
+											Line:   52,
 										},
 										File:   "pagerduty.flux",
 										Source: "if lvl == \"crit\" then\n        \"critical\"\n    else if lvl == \"info\" then\n        \"info\"\n    else if lvl == \"ok\" then\n        \"info\"\n    else\n        \"error\"",
 										Start: ast.Position{
 											Column: 10,
-											Line:   20,
+											Line:   45,
 										},
 									},
 								},
@@ -941,13 +1033,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 19,
-												Line:   21,
+												Line:   46,
 											},
 											File:   "pagerduty.flux",
 											Source: "\"critical\"",
 											Start: ast.Position{
 												Column: 9,
-												Line:   21,
+												Line:   46,
 											},
 										},
 									},
@@ -960,13 +1052,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 26,
-												Line:   20,
+												Line:   45,
 											},
 											File:   "pagerduty.flux",
 											Source: "lvl == \"crit\"",
 											Start: ast.Position{
 												Column: 13,
-												Line:   20,
+												Line:   45,
 											},
 										},
 									},
@@ -977,13 +1069,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 16,
-													Line:   20,
+													Line:   45,
 												},
 												File:   "pagerduty.flux",
 												Source: "lvl",
 												Start: ast.Position{
 													Column: 13,
-													Line:   20,
+													Line:   45,
 												},
 											},
 										},
@@ -997,13 +1089,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 26,
-													Line:   20,
+													Line:   45,
 												},
 												File:   "pagerduty.flux",
 												Source: "\"crit\"",
 												Start: ast.Position{
 													Column: 20,
-													Line:   20,
+													Line:   45,
 												},
 											},
 										},
@@ -1020,13 +1112,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 16,
-										Line:   27,
+										Line:   52,
 									},
 									File:   "pagerduty.flux",
 									Source: "if lvl == \"warn\" then\n        \"warning\"\n    else if lvl == \"crit\" then\n        \"critical\"\n    else if lvl == \"info\" then\n        \"info\"\n    else if lvl == \"ok\" then\n        \"info\"\n    else\n        \"error\"",
 									Start: ast.Position{
 										Column: 11,
-										Line:   18,
+										Line:   43,
 									},
 								},
 							},
@@ -1037,13 +1129,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 18,
-											Line:   19,
+											Line:   44,
 										},
 										File:   "pagerduty.flux",
 										Source: "\"warning\"",
 										Start: ast.Position{
 											Column: 9,
-											Line:   19,
+											Line:   44,
 										},
 									},
 								},
@@ -1056,13 +1148,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 27,
-											Line:   18,
+											Line:   43,
 										},
 										File:   "pagerduty.flux",
 										Source: "lvl == \"warn\"",
 										Start: ast.Position{
 											Column: 14,
-											Line:   18,
+											Line:   43,
 										},
 									},
 								},
@@ -1073,13 +1165,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 17,
-												Line:   18,
+												Line:   43,
 											},
 											File:   "pagerduty.flux",
 											Source: "lvl",
 											Start: ast.Position{
 												Column: 14,
-												Line:   18,
+												Line:   43,
 											},
 										},
 									},
@@ -1093,13 +1185,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 27,
-												Line:   18,
+												Line:   43,
 											},
 											File:   "pagerduty.flux",
 											Source: "\"warn\"",
 											Start: ast.Position{
 												Column: 21,
-												Line:   18,
+												Line:   43,
 											},
 										},
 									},
@@ -1118,13 +1210,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 15,
-										Line:   29,
+										Line:   54,
 									},
 									File:   "pagerduty.flux",
 									Source: "sev",
 									Start: ast.Position{
 										Column: 12,
-										Line:   29,
+										Line:   54,
 									},
 								},
 							},
@@ -1136,13 +1228,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 15,
-									Line:   29,
+									Line:   54,
 								},
 								File:   "pagerduty.flux",
 								Source: "return sev",
 								Start: ast.Position{
 									Column: 5,
-									Line:   29,
+									Line:   54,
 								},
 							},
 						},
@@ -1158,13 +1250,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 27,
-								Line:   16,
+								Line:   41,
 							},
 							File:   "pagerduty.flux",
 							Source: "level",
 							Start: ast.Position{
 								Column: 22,
-								Line:   16,
+								Line:   41,
 							},
 						},
 					},
@@ -1176,13 +1268,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 27,
-									Line:   16,
+									Line:   41,
 								},
 								File:   "pagerduty.flux",
 								Source: "level",
 								Start: ast.Position{
 									Column: 22,
-									Line:   16,
+									Line:   41,
 								},
 							},
 						},
@@ -1199,14 +1291,365 @@ var pkgAST = &ast.Package{
 				Errors:   nil,
 				Loc: &ast.SourceLocation{
 					End: ast.Position{
+						Column: 14,
+						Line:   65,
+					},
+					File:   "pagerduty.flux",
+					Source: "actionFromSeverity = (severity) => if strings.toLower(v: severity) == \"ok\" then\n    \"resolve\"\nelse\n    \"trigger\"",
+					Start: ast.Position{
+						Column: 1,
+						Line:   62,
+					},
+				},
+			},
+			ID: &ast.Identifier{
+				BaseNode: ast.BaseNode{
+					Comments: []ast.Comment{ast.Comment{Text: "// actionFromSeverity converts a severity to a PagerDuty action. ok converts to resolve. All other severities convert to trigger.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// ## Parameters\n"}, ast.Comment{Text: "// - `severity` is the severity to convert to a PagerDuty action.\n"}, ast.Comment{Text: "//\n"}},
+					Errors:   nil,
+					Loc: &ast.SourceLocation{
+						End: ast.Position{
+							Column: 19,
+							Line:   62,
+						},
+						File:   "pagerduty.flux",
+						Source: "actionFromSeverity",
+						Start: ast.Position{
+							Column: 1,
+							Line:   62,
+						},
+					},
+				},
+				Name: "actionFromSeverity",
+			},
+			Init: &ast.FunctionExpression{
+				Arrow: nil,
+				BaseNode: ast.BaseNode{
+					Comments: nil,
+					Errors:   nil,
+					Loc: &ast.SourceLocation{
+						End: ast.Position{
+							Column: 14,
+							Line:   65,
+						},
+						File:   "pagerduty.flux",
+						Source: "(severity) => if strings.toLower(v: severity) == \"ok\" then\n    \"resolve\"\nelse\n    \"trigger\"",
+						Start: ast.Position{
+							Column: 22,
+							Line:   62,
+						},
+					},
+				},
+				Body: &ast.ConditionalExpression{
+					Alternate: &ast.StringLiteral{
+						BaseNode: ast.BaseNode{
+							Comments: nil,
+							Errors:   nil,
+							Loc: &ast.SourceLocation{
+								End: ast.Position{
+									Column: 14,
+									Line:   65,
+								},
+								File:   "pagerduty.flux",
+								Source: "\"trigger\"",
+								Start: ast.Position{
+									Column: 5,
+									Line:   65,
+								},
+							},
+						},
+						Value: "trigger",
+					},
+					BaseNode: ast.BaseNode{
+						Comments: nil,
+						Errors:   nil,
+						Loc: &ast.SourceLocation{
+							End: ast.Position{
+								Column: 14,
+								Line:   65,
+							},
+							File:   "pagerduty.flux",
+							Source: "if strings.toLower(v: severity) == \"ok\" then\n    \"resolve\"\nelse\n    \"trigger\"",
+							Start: ast.Position{
+								Column: 36,
+								Line:   62,
+							},
+						},
+					},
+					Consequent: &ast.StringLiteral{
+						BaseNode: ast.BaseNode{
+							Comments: nil,
+							Errors:   nil,
+							Loc: &ast.SourceLocation{
+								End: ast.Position{
+									Column: 14,
+									Line:   63,
+								},
+								File:   "pagerduty.flux",
+								Source: "\"resolve\"",
+								Start: ast.Position{
+									Column: 5,
+									Line:   63,
+								},
+							},
+						},
+						Value: "resolve",
+					},
+					Test: &ast.BinaryExpression{
+						BaseNode: ast.BaseNode{
+							Comments: nil,
+							Errors:   nil,
+							Loc: &ast.SourceLocation{
+								End: ast.Position{
+									Column: 75,
+									Line:   62,
+								},
+								File:   "pagerduty.flux",
+								Source: "strings.toLower(v: severity) == \"ok\"",
+								Start: ast.Position{
+									Column: 39,
+									Line:   62,
+								},
+							},
+						},
+						Left: &ast.CallExpression{
+							Arguments: []ast.Expression{&ast.ObjectExpression{
+								BaseNode: ast.BaseNode{
+									Comments: nil,
+									Errors:   nil,
+									Loc: &ast.SourceLocation{
+										End: ast.Position{
+											Column: 66,
+											Line:   62,
+										},
+										File:   "pagerduty.flux",
+										Source: "v: severity",
+										Start: ast.Position{
+											Column: 55,
+											Line:   62,
+										},
+									},
+								},
+								Lbrace: nil,
+								Properties: []*ast.Property{&ast.Property{
+									BaseNode: ast.BaseNode{
+										Comments: nil,
+										Errors:   nil,
+										Loc: &ast.SourceLocation{
+											End: ast.Position{
+												Column: 66,
+												Line:   62,
+											},
+											File:   "pagerduty.flux",
+											Source: "v: severity",
+											Start: ast.Position{
+												Column: 55,
+												Line:   62,
+											},
+										},
+									},
+									Comma: nil,
+									Key: &ast.Identifier{
+										BaseNode: ast.BaseNode{
+											Comments: nil,
+											Errors:   nil,
+											Loc: &ast.SourceLocation{
+												End: ast.Position{
+													Column: 56,
+													Line:   62,
+												},
+												File:   "pagerduty.flux",
+												Source: "v",
+												Start: ast.Position{
+													Column: 55,
+													Line:   62,
+												},
+											},
+										},
+										Name: "v",
+									},
+									Separator: nil,
+									Value: &ast.Identifier{
+										BaseNode: ast.BaseNode{
+											Comments: nil,
+											Errors:   nil,
+											Loc: &ast.SourceLocation{
+												End: ast.Position{
+													Column: 66,
+													Line:   62,
+												},
+												File:   "pagerduty.flux",
+												Source: "severity",
+												Start: ast.Position{
+													Column: 58,
+													Line:   62,
+												},
+											},
+										},
+										Name: "severity",
+									},
+								}},
+								Rbrace: nil,
+								With:   nil,
+							}},
+							BaseNode: ast.BaseNode{
+								Comments: nil,
+								Errors:   nil,
+								Loc: &ast.SourceLocation{
+									End: ast.Position{
+										Column: 67,
+										Line:   62,
+									},
+									File:   "pagerduty.flux",
+									Source: "strings.toLower(v: severity)",
+									Start: ast.Position{
+										Column: 39,
+										Line:   62,
+									},
+								},
+							},
+							Callee: &ast.MemberExpression{
+								BaseNode: ast.BaseNode{
+									Comments: nil,
+									Errors:   nil,
+									Loc: &ast.SourceLocation{
+										End: ast.Position{
+											Column: 54,
+											Line:   62,
+										},
+										File:   "pagerduty.flux",
+										Source: "strings.toLower",
+										Start: ast.Position{
+											Column: 39,
+											Line:   62,
+										},
+									},
+								},
+								Lbrack: nil,
+								Object: &ast.Identifier{
+									BaseNode: ast.BaseNode{
+										Comments: nil,
+										Errors:   nil,
+										Loc: &ast.SourceLocation{
+											End: ast.Position{
+												Column: 46,
+												Line:   62,
+											},
+											File:   "pagerduty.flux",
+											Source: "strings",
+											Start: ast.Position{
+												Column: 39,
+												Line:   62,
+											},
+										},
+									},
+									Name: "strings",
+								},
+								Property: &ast.Identifier{
+									BaseNode: ast.BaseNode{
+										Comments: nil,
+										Errors:   nil,
+										Loc: &ast.SourceLocation{
+											End: ast.Position{
+												Column: 54,
+												Line:   62,
+											},
+											File:   "pagerduty.flux",
+											Source: "toLower",
+											Start: ast.Position{
+												Column: 47,
+												Line:   62,
+											},
+										},
+									},
+									Name: "toLower",
+								},
+								Rbrack: nil,
+							},
+							Lparen: nil,
+							Rparen: nil,
+						},
+						Operator: 17,
+						Right: &ast.StringLiteral{
+							BaseNode: ast.BaseNode{
+								Comments: nil,
+								Errors:   nil,
+								Loc: &ast.SourceLocation{
+									End: ast.Position{
+										Column: 75,
+										Line:   62,
+									},
+									File:   "pagerduty.flux",
+									Source: "\"ok\"",
+									Start: ast.Position{
+										Column: 71,
+										Line:   62,
+									},
+								},
+							},
+							Value: "ok",
+						},
+					},
+					Tk_else: nil,
+					Tk_if:   nil,
+					Tk_then: nil,
+				},
+				Lparen: nil,
+				Params: []*ast.Property{&ast.Property{
+					BaseNode: ast.BaseNode{
+						Comments: nil,
+						Errors:   nil,
+						Loc: &ast.SourceLocation{
+							End: ast.Position{
+								Column: 31,
+								Line:   62,
+							},
+							File:   "pagerduty.flux",
+							Source: "severity",
+							Start: ast.Position{
+								Column: 23,
+								Line:   62,
+							},
+						},
+					},
+					Comma: nil,
+					Key: &ast.Identifier{
+						BaseNode: ast.BaseNode{
+							Comments: nil,
+							Errors:   nil,
+							Loc: &ast.SourceLocation{
+								End: ast.Position{
+									Column: 31,
+									Line:   62,
+								},
+								File:   "pagerduty.flux",
+								Source: "severity",
+								Start: ast.Position{
+									Column: 23,
+									Line:   62,
+								},
+							},
+						},
+						Name: "severity",
+					},
+					Separator: nil,
+					Value:     nil,
+				}},
+				Rparan: nil,
+			},
+		}, &ast.VariableAssignment{
+			BaseNode: ast.BaseNode{
+				Comments: nil,
+				Errors:   nil,
+				Loc: &ast.SourceLocation{
+					End: ast.Position{
 						Column: 96,
-						Line:   33,
+						Line:   68,
 					},
 					File:   "pagerduty.flux",
 					Source: "actionFromLevel = (level) => if strings.toLower(v: level) == \"ok\" then \"resolve\" else \"trigger\"",
 					Start: ast.Position{
 						Column: 1,
-						Line:   33,
+						Line:   68,
 					},
 				},
 			},
@@ -1217,13 +1660,13 @@ var pkgAST = &ast.Package{
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 16,
-							Line:   33,
+							Line:   68,
 						},
 						File:   "pagerduty.flux",
 						Source: "actionFromLevel",
 						Start: ast.Position{
 							Column: 1,
-							Line:   33,
+							Line:   68,
 						},
 					},
 				},
@@ -1237,13 +1680,13 @@ var pkgAST = &ast.Package{
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 96,
-							Line:   33,
+							Line:   68,
 						},
 						File:   "pagerduty.flux",
 						Source: "(level) => if strings.toLower(v: level) == \"ok\" then \"resolve\" else \"trigger\"",
 						Start: ast.Position{
 							Column: 19,
-							Line:   33,
+							Line:   68,
 						},
 					},
 				},
@@ -1255,13 +1698,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 96,
-									Line:   33,
+									Line:   68,
 								},
 								File:   "pagerduty.flux",
 								Source: "\"trigger\"",
 								Start: ast.Position{
 									Column: 87,
-									Line:   33,
+									Line:   68,
 								},
 							},
 						},
@@ -1273,13 +1716,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 96,
-								Line:   33,
+								Line:   68,
 							},
 							File:   "pagerduty.flux",
 							Source: "if strings.toLower(v: level) == \"ok\" then \"resolve\" else \"trigger\"",
 							Start: ast.Position{
 								Column: 30,
-								Line:   33,
+								Line:   68,
 							},
 						},
 					},
@@ -1290,13 +1733,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 81,
-									Line:   33,
+									Line:   68,
 								},
 								File:   "pagerduty.flux",
 								Source: "\"resolve\"",
 								Start: ast.Position{
 									Column: 72,
-									Line:   33,
+									Line:   68,
 								},
 							},
 						},
@@ -1309,13 +1752,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 66,
-									Line:   33,
+									Line:   68,
 								},
 								File:   "pagerduty.flux",
 								Source: "strings.toLower(v: level) == \"ok\"",
 								Start: ast.Position{
 									Column: 33,
-									Line:   33,
+									Line:   68,
 								},
 							},
 						},
@@ -1327,13 +1770,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 57,
-											Line:   33,
+											Line:   68,
 										},
 										File:   "pagerduty.flux",
 										Source: "v: level",
 										Start: ast.Position{
 											Column: 49,
-											Line:   33,
+											Line:   68,
 										},
 									},
 								},
@@ -1345,13 +1788,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 57,
-												Line:   33,
+												Line:   68,
 											},
 											File:   "pagerduty.flux",
 											Source: "v: level",
 											Start: ast.Position{
 												Column: 49,
-												Line:   33,
+												Line:   68,
 											},
 										},
 									},
@@ -1363,13 +1806,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 50,
-													Line:   33,
+													Line:   68,
 												},
 												File:   "pagerduty.flux",
 												Source: "v",
 												Start: ast.Position{
 													Column: 49,
-													Line:   33,
+													Line:   68,
 												},
 											},
 										},
@@ -1383,13 +1826,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 57,
-													Line:   33,
+													Line:   68,
 												},
 												File:   "pagerduty.flux",
 												Source: "level",
 												Start: ast.Position{
 													Column: 52,
-													Line:   33,
+													Line:   68,
 												},
 											},
 										},
@@ -1405,13 +1848,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 58,
-										Line:   33,
+										Line:   68,
 									},
 									File:   "pagerduty.flux",
 									Source: "strings.toLower(v: level)",
 									Start: ast.Position{
 										Column: 33,
-										Line:   33,
+										Line:   68,
 									},
 								},
 							},
@@ -1422,13 +1865,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 48,
-											Line:   33,
+											Line:   68,
 										},
 										File:   "pagerduty.flux",
 										Source: "strings.toLower",
 										Start: ast.Position{
 											Column: 33,
-											Line:   33,
+											Line:   68,
 										},
 									},
 								},
@@ -1440,13 +1883,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 40,
-												Line:   33,
+												Line:   68,
 											},
 											File:   "pagerduty.flux",
 											Source: "strings",
 											Start: ast.Position{
 												Column: 33,
-												Line:   33,
+												Line:   68,
 											},
 										},
 									},
@@ -1459,13 +1902,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 48,
-												Line:   33,
+												Line:   68,
 											},
 											File:   "pagerduty.flux",
 											Source: "toLower",
 											Start: ast.Position{
 												Column: 41,
-												Line:   33,
+												Line:   68,
 											},
 										},
 									},
@@ -1484,13 +1927,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 66,
-										Line:   33,
+										Line:   68,
 									},
 									File:   "pagerduty.flux",
 									Source: "\"ok\"",
 									Start: ast.Position{
 										Column: 62,
-										Line:   33,
+										Line:   68,
 									},
 								},
 							},
@@ -1509,13 +1952,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 25,
-								Line:   33,
+								Line:   68,
 							},
 							File:   "pagerduty.flux",
 							Source: "level",
 							Start: ast.Position{
 								Column: 20,
-								Line:   33,
+								Line:   68,
 							},
 						},
 					},
@@ -1527,13 +1970,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 25,
-									Line:   33,
+									Line:   68,
 								},
 								File:   "pagerduty.flux",
 								Source: "level",
 								Start: ast.Position{
 									Column: 20,
-									Line:   33,
+									Line:   68,
 								},
 							},
 						},
@@ -1551,30 +1994,30 @@ var pkgAST = &ast.Package{
 				Loc: &ast.SourceLocation{
 					End: ast.Position{
 						Column: 2,
-						Line:   85,
+						Line:   149,
 					},
 					File:   "pagerduty.flux",
 					Source: "sendEvent = (\n        pagerdutyURL=defaultURL,\n        routingKey,\n        client,\n        clientURL,\n        dedupKey,\n        class,\n        group,\n        severity,\n        eventAction,\n        source,\n        summary,\n        timestamp,\n) => {\n    payload = {\n        summary: summary,\n        timestamp: timestamp,\n        source: source,\n        severity: severity,\n        group: group,\n        class: class,\n    }\n    data = {\n        payload: payload,\n        routing_key: routingKey,\n        dedup_key: dedupKey,\n        event_action: eventAction,\n        client: client,\n        client_url: clientURL,\n    }\n    headers = {\n        \"Accept\": \"application/vnd.pagerduty+json;version=2\",\n        \"Content-Type\": \"application/json\",\n    }\n    enc = json.encode(v: data)\n\n    return http.post(headers: headers, url: pagerdutyURL, data: enc)\n}",
 					Start: ast.Position{
 						Column: 1,
-						Line:   48,
+						Line:   112,
 					},
 				},
 			},
 			ID: &ast.Identifier{
 				BaseNode: ast.BaseNode{
-					Comments: []ast.Comment{ast.Comment{Text: "// `sendEvent` sends an event to PagerDuty, the description of some of these parameters taken from the pagerduty documentation at https://v2.developer.pagerduty.com/docs/send-an-event-events-api-v2\n"}, ast.Comment{Text: "// `pagerdutyURL` - sring - URL of the pagerduty endpoint.  Defaults to: `option defaultURL = \"https://events.pagerduty.com/v2/enqueue\"`\n"}, ast.Comment{Text: "// `routingKey` - string - routingKey.\n"}, ast.Comment{Text: "// `client` - string - name of the client sending the alert.\n"}, ast.Comment{Text: "// `clientURL` - string - url of the client sending the alert.\n"}, ast.Comment{Text: "// `dedupkey` - string - a per alert ID. It acts as deduplication key, that allows you to ack or change the severity of previous messages. Supports a maximum of 255 characters.\n"}, ast.Comment{Text: "// `class` - string - The class/type of the event, for example ping failure or cpu load.\n"}, ast.Comment{Text: "// `group` - string - Logical grouping of components of a service, for example app-stack.\n"}, ast.Comment{Text: "// `severity` - string - The perceived severity of the status the event is describing with respect to the affected system. This can be critical, error, warning or info.\n"}, ast.Comment{Text: "// `eventAction` - string - The type of event to send to PagerDuty (ex. trigger, resolve, acknowledge)\n"}, ast.Comment{Text: "// `source` - string - The unique location of the affected system, preferably a hostname or FQDN.\n"}, ast.Comment{Text: "// `summary` - string - A brief text summary of the event, used to generate the summaries/titles of any associated alerts. The maximum permitted length of this property is 1024 characters.\n"}, ast.Comment{Text: "// `timestamp` - string - The time at which the emitting tool detected or generated the event, in RFC 3339 nano format.\n"}},
+					Comments: []ast.Comment{ast.Comment{Text: "// sendEvent sends an event to PagerDuty.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// ## Parameters\n"}, ast.Comment{Text: "// - `pagerdutyURL` is the URL of the PagerDuty endpoint.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "//      Defaults to https://events.page rduty.com/v2/enqueue.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// - `routingKey` is the routing key generated from your PagerDuty integration.\n"}, ast.Comment{Text: "// - `client` is the name of the client sending the alert.\n"}, ast.Comment{Text: "// - `clientURL` is the URL of the client sending the alert.\n"}, ast.Comment{Text: "// - `dedupkey` is a per-alert ID that acts as deduplication key and allows you to acknowledge or change the severity of previous messages. Supports a maximum of 255 characters.\n"}, ast.Comment{Text: "// - `class` is the class or type of the event.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "//      Classes are user-defined.\n"}, ast.Comment{Text: "//      For example, ping failure or cpu load.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// - `group` is a logical grouping used by PagerDuty.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "//      Groups are user-defined.\n"}, ast.Comment{Text: "//      For example, app-stack.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// - `severity` is the severity of the event.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "//      Valid values include:\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "//        critical\n"}, ast.Comment{Text: "//        error\n"}, ast.Comment{Text: "//        warning\n"}, ast.Comment{Text: "//        info\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// - `eventAction` is the event type to send to PagerDuty.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "//      Valid values include:\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "//        trigger\n"}, ast.Comment{Text: "//        resolve\n"}, ast.Comment{Text: "//        acknowledge\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// - `source` is the unique location of the affected system. For example, the hostname or fully qualified domain name (FQDN).\n"}, ast.Comment{Text: "// - `summary` is a brief text summary of the event used as the summaries or titles of associated alerts. The maximum permitted length is 1024 characters.\n"}, ast.Comment{Text: "// - `timestamp` is the time the detected event occurred in RFC3339nano format.\n"}, ast.Comment{Text: "//\n"}},
 					Errors:   nil,
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 10,
-							Line:   48,
+							Line:   112,
 						},
 						File:   "pagerduty.flux",
 						Source: "sendEvent",
 						Start: ast.Position{
 							Column: 1,
-							Line:   48,
+							Line:   112,
 						},
 					},
 				},
@@ -1588,13 +2031,13 @@ var pkgAST = &ast.Package{
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 2,
-							Line:   85,
+							Line:   149,
 						},
 						File:   "pagerduty.flux",
 						Source: "(\n        pagerdutyURL=defaultURL,\n        routingKey,\n        client,\n        clientURL,\n        dedupKey,\n        class,\n        group,\n        severity,\n        eventAction,\n        source,\n        summary,\n        timestamp,\n) => {\n    payload = {\n        summary: summary,\n        timestamp: timestamp,\n        source: source,\n        severity: severity,\n        group: group,\n        class: class,\n    }\n    data = {\n        payload: payload,\n        routing_key: routingKey,\n        dedup_key: dedupKey,\n        event_action: eventAction,\n        client: client,\n        client_url: clientURL,\n    }\n    headers = {\n        \"Accept\": \"application/vnd.pagerduty+json;version=2\",\n        \"Content-Type\": \"application/json\",\n    }\n    enc = json.encode(v: data)\n\n    return http.post(headers: headers, url: pagerdutyURL, data: enc)\n}",
 						Start: ast.Position{
 							Column: 13,
-							Line:   48,
+							Line:   112,
 						},
 					},
 				},
@@ -1605,13 +2048,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 2,
-								Line:   85,
+								Line:   149,
 							},
 							File:   "pagerduty.flux",
 							Source: "{\n    payload = {\n        summary: summary,\n        timestamp: timestamp,\n        source: source,\n        severity: severity,\n        group: group,\n        class: class,\n    }\n    data = {\n        payload: payload,\n        routing_key: routingKey,\n        dedup_key: dedupKey,\n        event_action: eventAction,\n        client: client,\n        client_url: clientURL,\n    }\n    headers = {\n        \"Accept\": \"application/vnd.pagerduty+json;version=2\",\n        \"Content-Type\": \"application/json\",\n    }\n    enc = json.encode(v: data)\n\n    return http.post(headers: headers, url: pagerdutyURL, data: enc)\n}",
 							Start: ast.Position{
 								Column: 6,
-								Line:   61,
+								Line:   125,
 							},
 						},
 					},
@@ -1622,13 +2065,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 6,
-									Line:   69,
+									Line:   133,
 								},
 								File:   "pagerduty.flux",
 								Source: "payload = {\n        summary: summary,\n        timestamp: timestamp,\n        source: source,\n        severity: severity,\n        group: group,\n        class: class,\n    }",
 								Start: ast.Position{
 									Column: 5,
-									Line:   62,
+									Line:   126,
 								},
 							},
 						},
@@ -1639,13 +2082,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 12,
-										Line:   62,
+										Line:   126,
 									},
 									File:   "pagerduty.flux",
 									Source: "payload",
 									Start: ast.Position{
 										Column: 5,
-										Line:   62,
+										Line:   126,
 									},
 								},
 							},
@@ -1658,13 +2101,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 6,
-										Line:   69,
+										Line:   133,
 									},
 									File:   "pagerduty.flux",
 									Source: "{\n        summary: summary,\n        timestamp: timestamp,\n        source: source,\n        severity: severity,\n        group: group,\n        class: class,\n    }",
 									Start: ast.Position{
 										Column: 15,
-										Line:   62,
+										Line:   126,
 									},
 								},
 							},
@@ -1676,13 +2119,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 25,
-											Line:   63,
+											Line:   127,
 										},
 										File:   "pagerduty.flux",
 										Source: "summary: summary",
 										Start: ast.Position{
 											Column: 9,
-											Line:   63,
+											Line:   127,
 										},
 									},
 								},
@@ -1694,13 +2137,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 16,
-												Line:   63,
+												Line:   127,
 											},
 											File:   "pagerduty.flux",
 											Source: "summary",
 											Start: ast.Position{
 												Column: 9,
-												Line:   63,
+												Line:   127,
 											},
 										},
 									},
@@ -1714,13 +2157,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 25,
-												Line:   63,
+												Line:   127,
 											},
 											File:   "pagerduty.flux",
 											Source: "summary",
 											Start: ast.Position{
 												Column: 18,
-												Line:   63,
+												Line:   127,
 											},
 										},
 									},
@@ -1733,13 +2176,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 29,
-											Line:   64,
+											Line:   128,
 										},
 										File:   "pagerduty.flux",
 										Source: "timestamp: timestamp",
 										Start: ast.Position{
 											Column: 9,
-											Line:   64,
+											Line:   128,
 										},
 									},
 								},
@@ -1751,13 +2194,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 18,
-												Line:   64,
+												Line:   128,
 											},
 											File:   "pagerduty.flux",
 											Source: "timestamp",
 											Start: ast.Position{
 												Column: 9,
-												Line:   64,
+												Line:   128,
 											},
 										},
 									},
@@ -1771,13 +2214,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 29,
-												Line:   64,
+												Line:   128,
 											},
 											File:   "pagerduty.flux",
 											Source: "timestamp",
 											Start: ast.Position{
 												Column: 20,
-												Line:   64,
+												Line:   128,
 											},
 										},
 									},
@@ -1790,13 +2233,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 23,
-											Line:   65,
+											Line:   129,
 										},
 										File:   "pagerduty.flux",
 										Source: "source: source",
 										Start: ast.Position{
 											Column: 9,
-											Line:   65,
+											Line:   129,
 										},
 									},
 								},
@@ -1808,13 +2251,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 15,
-												Line:   65,
+												Line:   129,
 											},
 											File:   "pagerduty.flux",
 											Source: "source",
 											Start: ast.Position{
 												Column: 9,
-												Line:   65,
+												Line:   129,
 											},
 										},
 									},
@@ -1828,13 +2271,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 23,
-												Line:   65,
+												Line:   129,
 											},
 											File:   "pagerduty.flux",
 											Source: "source",
 											Start: ast.Position{
 												Column: 17,
-												Line:   65,
+												Line:   129,
 											},
 										},
 									},
@@ -1847,13 +2290,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 27,
-											Line:   66,
+											Line:   130,
 										},
 										File:   "pagerduty.flux",
 										Source: "severity: severity",
 										Start: ast.Position{
 											Column: 9,
-											Line:   66,
+											Line:   130,
 										},
 									},
 								},
@@ -1865,13 +2308,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 17,
-												Line:   66,
+												Line:   130,
 											},
 											File:   "pagerduty.flux",
 											Source: "severity",
 											Start: ast.Position{
 												Column: 9,
-												Line:   66,
+												Line:   130,
 											},
 										},
 									},
@@ -1885,13 +2328,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 27,
-												Line:   66,
+												Line:   130,
 											},
 											File:   "pagerduty.flux",
 											Source: "severity",
 											Start: ast.Position{
 												Column: 19,
-												Line:   66,
+												Line:   130,
 											},
 										},
 									},
@@ -1904,13 +2347,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 21,
-											Line:   67,
+											Line:   131,
 										},
 										File:   "pagerduty.flux",
 										Source: "group: group",
 										Start: ast.Position{
 											Column: 9,
-											Line:   67,
+											Line:   131,
 										},
 									},
 								},
@@ -1922,13 +2365,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 14,
-												Line:   67,
+												Line:   131,
 											},
 											File:   "pagerduty.flux",
 											Source: "group",
 											Start: ast.Position{
 												Column: 9,
-												Line:   67,
+												Line:   131,
 											},
 										},
 									},
@@ -1942,13 +2385,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 21,
-												Line:   67,
+												Line:   131,
 											},
 											File:   "pagerduty.flux",
 											Source: "group",
 											Start: ast.Position{
 												Column: 16,
-												Line:   67,
+												Line:   131,
 											},
 										},
 									},
@@ -1961,13 +2404,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 21,
-											Line:   68,
+											Line:   132,
 										},
 										File:   "pagerduty.flux",
 										Source: "class: class",
 										Start: ast.Position{
 											Column: 9,
-											Line:   68,
+											Line:   132,
 										},
 									},
 								},
@@ -1979,13 +2422,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 14,
-												Line:   68,
+												Line:   132,
 											},
 											File:   "pagerduty.flux",
 											Source: "class",
 											Start: ast.Position{
 												Column: 9,
-												Line:   68,
+												Line:   132,
 											},
 										},
 									},
@@ -1999,13 +2442,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 21,
-												Line:   68,
+												Line:   132,
 											},
 											File:   "pagerduty.flux",
 											Source: "class",
 											Start: ast.Position{
 												Column: 16,
-												Line:   68,
+												Line:   132,
 											},
 										},
 									},
@@ -2022,13 +2465,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 6,
-									Line:   77,
+									Line:   141,
 								},
 								File:   "pagerduty.flux",
 								Source: "data = {\n        payload: payload,\n        routing_key: routingKey,\n        dedup_key: dedupKey,\n        event_action: eventAction,\n        client: client,\n        client_url: clientURL,\n    }",
 								Start: ast.Position{
 									Column: 5,
-									Line:   70,
+									Line:   134,
 								},
 							},
 						},
@@ -2039,13 +2482,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 9,
-										Line:   70,
+										Line:   134,
 									},
 									File:   "pagerduty.flux",
 									Source: "data",
 									Start: ast.Position{
 										Column: 5,
-										Line:   70,
+										Line:   134,
 									},
 								},
 							},
@@ -2058,13 +2501,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 6,
-										Line:   77,
+										Line:   141,
 									},
 									File:   "pagerduty.flux",
 									Source: "{\n        payload: payload,\n        routing_key: routingKey,\n        dedup_key: dedupKey,\n        event_action: eventAction,\n        client: client,\n        client_url: clientURL,\n    }",
 									Start: ast.Position{
 										Column: 12,
-										Line:   70,
+										Line:   134,
 									},
 								},
 							},
@@ -2076,13 +2519,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 25,
-											Line:   71,
+											Line:   135,
 										},
 										File:   "pagerduty.flux",
 										Source: "payload: payload",
 										Start: ast.Position{
 											Column: 9,
-											Line:   71,
+											Line:   135,
 										},
 									},
 								},
@@ -2094,13 +2537,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 16,
-												Line:   71,
+												Line:   135,
 											},
 											File:   "pagerduty.flux",
 											Source: "payload",
 											Start: ast.Position{
 												Column: 9,
-												Line:   71,
+												Line:   135,
 											},
 										},
 									},
@@ -2114,13 +2557,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 25,
-												Line:   71,
+												Line:   135,
 											},
 											File:   "pagerduty.flux",
 											Source: "payload",
 											Start: ast.Position{
 												Column: 18,
-												Line:   71,
+												Line:   135,
 											},
 										},
 									},
@@ -2133,13 +2576,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 32,
-											Line:   72,
+											Line:   136,
 										},
 										File:   "pagerduty.flux",
 										Source: "routing_key: routingKey",
 										Start: ast.Position{
 											Column: 9,
-											Line:   72,
+											Line:   136,
 										},
 									},
 								},
@@ -2151,13 +2594,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 20,
-												Line:   72,
+												Line:   136,
 											},
 											File:   "pagerduty.flux",
 											Source: "routing_key",
 											Start: ast.Position{
 												Column: 9,
-												Line:   72,
+												Line:   136,
 											},
 										},
 									},
@@ -2171,13 +2614,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 32,
-												Line:   72,
+												Line:   136,
 											},
 											File:   "pagerduty.flux",
 											Source: "routingKey",
 											Start: ast.Position{
 												Column: 22,
-												Line:   72,
+												Line:   136,
 											},
 										},
 									},
@@ -2190,13 +2633,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 28,
-											Line:   73,
+											Line:   137,
 										},
 										File:   "pagerduty.flux",
 										Source: "dedup_key: dedupKey",
 										Start: ast.Position{
 											Column: 9,
-											Line:   73,
+											Line:   137,
 										},
 									},
 								},
@@ -2208,13 +2651,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 18,
-												Line:   73,
+												Line:   137,
 											},
 											File:   "pagerduty.flux",
 											Source: "dedup_key",
 											Start: ast.Position{
 												Column: 9,
-												Line:   73,
+												Line:   137,
 											},
 										},
 									},
@@ -2228,13 +2671,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 28,
-												Line:   73,
+												Line:   137,
 											},
 											File:   "pagerduty.flux",
 											Source: "dedupKey",
 											Start: ast.Position{
 												Column: 20,
-												Line:   73,
+												Line:   137,
 											},
 										},
 									},
@@ -2247,13 +2690,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 34,
-											Line:   74,
+											Line:   138,
 										},
 										File:   "pagerduty.flux",
 										Source: "event_action: eventAction",
 										Start: ast.Position{
 											Column: 9,
-											Line:   74,
+											Line:   138,
 										},
 									},
 								},
@@ -2265,13 +2708,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 21,
-												Line:   74,
+												Line:   138,
 											},
 											File:   "pagerduty.flux",
 											Source: "event_action",
 											Start: ast.Position{
 												Column: 9,
-												Line:   74,
+												Line:   138,
 											},
 										},
 									},
@@ -2285,13 +2728,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 34,
-												Line:   74,
+												Line:   138,
 											},
 											File:   "pagerduty.flux",
 											Source: "eventAction",
 											Start: ast.Position{
 												Column: 23,
-												Line:   74,
+												Line:   138,
 											},
 										},
 									},
@@ -2304,13 +2747,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 23,
-											Line:   75,
+											Line:   139,
 										},
 										File:   "pagerduty.flux",
 										Source: "client: client",
 										Start: ast.Position{
 											Column: 9,
-											Line:   75,
+											Line:   139,
 										},
 									},
 								},
@@ -2322,13 +2765,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 15,
-												Line:   75,
+												Line:   139,
 											},
 											File:   "pagerduty.flux",
 											Source: "client",
 											Start: ast.Position{
 												Column: 9,
-												Line:   75,
+												Line:   139,
 											},
 										},
 									},
@@ -2342,13 +2785,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 23,
-												Line:   75,
+												Line:   139,
 											},
 											File:   "pagerduty.flux",
 											Source: "client",
 											Start: ast.Position{
 												Column: 17,
-												Line:   75,
+												Line:   139,
 											},
 										},
 									},
@@ -2361,13 +2804,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 30,
-											Line:   76,
+											Line:   140,
 										},
 										File:   "pagerduty.flux",
 										Source: "client_url: clientURL",
 										Start: ast.Position{
 											Column: 9,
-											Line:   76,
+											Line:   140,
 										},
 									},
 								},
@@ -2379,13 +2822,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 19,
-												Line:   76,
+												Line:   140,
 											},
 											File:   "pagerduty.flux",
 											Source: "client_url",
 											Start: ast.Position{
 												Column: 9,
-												Line:   76,
+												Line:   140,
 											},
 										},
 									},
@@ -2399,13 +2842,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 30,
-												Line:   76,
+												Line:   140,
 											},
 											File:   "pagerduty.flux",
 											Source: "clientURL",
 											Start: ast.Position{
 												Column: 21,
-												Line:   76,
+												Line:   140,
 											},
 										},
 									},
@@ -2422,13 +2865,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 6,
-									Line:   81,
+									Line:   145,
 								},
 								File:   "pagerduty.flux",
 								Source: "headers = {\n        \"Accept\": \"application/vnd.pagerduty+json;version=2\",\n        \"Content-Type\": \"application/json\",\n    }",
 								Start: ast.Position{
 									Column: 5,
-									Line:   78,
+									Line:   142,
 								},
 							},
 						},
@@ -2439,13 +2882,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 12,
-										Line:   78,
+										Line:   142,
 									},
 									File:   "pagerduty.flux",
 									Source: "headers",
 									Start: ast.Position{
 										Column: 5,
-										Line:   78,
+										Line:   142,
 									},
 								},
 							},
@@ -2458,13 +2901,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 6,
-										Line:   81,
+										Line:   145,
 									},
 									File:   "pagerduty.flux",
 									Source: "{\n        \"Accept\": \"application/vnd.pagerduty+json;version=2\",\n        \"Content-Type\": \"application/json\",\n    }",
 									Start: ast.Position{
 										Column: 15,
-										Line:   78,
+										Line:   142,
 									},
 								},
 							},
@@ -2476,13 +2919,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 61,
-											Line:   79,
+											Line:   143,
 										},
 										File:   "pagerduty.flux",
 										Source: "\"Accept\": \"application/vnd.pagerduty+json;version=2\"",
 										Start: ast.Position{
 											Column: 9,
-											Line:   79,
+											Line:   143,
 										},
 									},
 								},
@@ -2494,13 +2937,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 17,
-												Line:   79,
+												Line:   143,
 											},
 											File:   "pagerduty.flux",
 											Source: "\"Accept\"",
 											Start: ast.Position{
 												Column: 9,
-												Line:   79,
+												Line:   143,
 											},
 										},
 									},
@@ -2514,13 +2957,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 61,
-												Line:   79,
+												Line:   143,
 											},
 											File:   "pagerduty.flux",
 											Source: "\"application/vnd.pagerduty+json;version=2\"",
 											Start: ast.Position{
 												Column: 19,
-												Line:   79,
+												Line:   143,
 											},
 										},
 									},
@@ -2533,13 +2976,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 43,
-											Line:   80,
+											Line:   144,
 										},
 										File:   "pagerduty.flux",
 										Source: "\"Content-Type\": \"application/json\"",
 										Start: ast.Position{
 											Column: 9,
-											Line:   80,
+											Line:   144,
 										},
 									},
 								},
@@ -2551,13 +2994,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 23,
-												Line:   80,
+												Line:   144,
 											},
 											File:   "pagerduty.flux",
 											Source: "\"Content-Type\"",
 											Start: ast.Position{
 												Column: 9,
-												Line:   80,
+												Line:   144,
 											},
 										},
 									},
@@ -2571,13 +3014,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 43,
-												Line:   80,
+												Line:   144,
 											},
 											File:   "pagerduty.flux",
 											Source: "\"application/json\"",
 											Start: ast.Position{
 												Column: 25,
-												Line:   80,
+												Line:   144,
 											},
 										},
 									},
@@ -2594,13 +3037,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 31,
-									Line:   82,
+									Line:   146,
 								},
 								File:   "pagerduty.flux",
 								Source: "enc = json.encode(v: data)",
 								Start: ast.Position{
 									Column: 5,
-									Line:   82,
+									Line:   146,
 								},
 							},
 						},
@@ -2611,13 +3054,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 8,
-										Line:   82,
+										Line:   146,
 									},
 									File:   "pagerduty.flux",
 									Source: "enc",
 									Start: ast.Position{
 										Column: 5,
-										Line:   82,
+										Line:   146,
 									},
 								},
 							},
@@ -2631,13 +3074,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 30,
-											Line:   82,
+											Line:   146,
 										},
 										File:   "pagerduty.flux",
 										Source: "v: data",
 										Start: ast.Position{
 											Column: 23,
-											Line:   82,
+											Line:   146,
 										},
 									},
 								},
@@ -2649,13 +3092,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 30,
-												Line:   82,
+												Line:   146,
 											},
 											File:   "pagerduty.flux",
 											Source: "v: data",
 											Start: ast.Position{
 												Column: 23,
-												Line:   82,
+												Line:   146,
 											},
 										},
 									},
@@ -2667,13 +3110,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 24,
-													Line:   82,
+													Line:   146,
 												},
 												File:   "pagerduty.flux",
 												Source: "v",
 												Start: ast.Position{
 													Column: 23,
-													Line:   82,
+													Line:   146,
 												},
 											},
 										},
@@ -2687,13 +3130,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 30,
-													Line:   82,
+													Line:   146,
 												},
 												File:   "pagerduty.flux",
 												Source: "data",
 												Start: ast.Position{
 													Column: 26,
-													Line:   82,
+													Line:   146,
 												},
 											},
 										},
@@ -2709,13 +3152,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 31,
-										Line:   82,
+										Line:   146,
 									},
 									File:   "pagerduty.flux",
 									Source: "json.encode(v: data)",
 									Start: ast.Position{
 										Column: 11,
-										Line:   82,
+										Line:   146,
 									},
 								},
 							},
@@ -2726,13 +3169,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 22,
-											Line:   82,
+											Line:   146,
 										},
 										File:   "pagerduty.flux",
 										Source: "json.encode",
 										Start: ast.Position{
 											Column: 11,
-											Line:   82,
+											Line:   146,
 										},
 									},
 								},
@@ -2744,13 +3187,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 15,
-												Line:   82,
+												Line:   146,
 											},
 											File:   "pagerduty.flux",
 											Source: "json",
 											Start: ast.Position{
 												Column: 11,
-												Line:   82,
+												Line:   146,
 											},
 										},
 									},
@@ -2763,13 +3206,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 22,
-												Line:   82,
+												Line:   146,
 											},
 											File:   "pagerduty.flux",
 											Source: "encode",
 											Start: ast.Position{
 												Column: 16,
-												Line:   82,
+												Line:   146,
 											},
 										},
 									},
@@ -2789,13 +3232,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 68,
-											Line:   84,
+											Line:   148,
 										},
 										File:   "pagerduty.flux",
 										Source: "headers: headers, url: pagerdutyURL, data: enc",
 										Start: ast.Position{
 											Column: 22,
-											Line:   84,
+											Line:   148,
 										},
 									},
 								},
@@ -2807,13 +3250,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 38,
-												Line:   84,
+												Line:   148,
 											},
 											File:   "pagerduty.flux",
 											Source: "headers: headers",
 											Start: ast.Position{
 												Column: 22,
-												Line:   84,
+												Line:   148,
 											},
 										},
 									},
@@ -2825,13 +3268,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 29,
-													Line:   84,
+													Line:   148,
 												},
 												File:   "pagerduty.flux",
 												Source: "headers",
 												Start: ast.Position{
 													Column: 22,
-													Line:   84,
+													Line:   148,
 												},
 											},
 										},
@@ -2845,13 +3288,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 38,
-													Line:   84,
+													Line:   148,
 												},
 												File:   "pagerduty.flux",
 												Source: "headers",
 												Start: ast.Position{
 													Column: 31,
-													Line:   84,
+													Line:   148,
 												},
 											},
 										},
@@ -2864,13 +3307,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 57,
-												Line:   84,
+												Line:   148,
 											},
 											File:   "pagerduty.flux",
 											Source: "url: pagerdutyURL",
 											Start: ast.Position{
 												Column: 40,
-												Line:   84,
+												Line:   148,
 											},
 										},
 									},
@@ -2882,13 +3325,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 43,
-													Line:   84,
+													Line:   148,
 												},
 												File:   "pagerduty.flux",
 												Source: "url",
 												Start: ast.Position{
 													Column: 40,
-													Line:   84,
+													Line:   148,
 												},
 											},
 										},
@@ -2902,13 +3345,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 57,
-													Line:   84,
+													Line:   148,
 												},
 												File:   "pagerduty.flux",
 												Source: "pagerdutyURL",
 												Start: ast.Position{
 													Column: 45,
-													Line:   84,
+													Line:   148,
 												},
 											},
 										},
@@ -2921,13 +3364,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 68,
-												Line:   84,
+												Line:   148,
 											},
 											File:   "pagerduty.flux",
 											Source: "data: enc",
 											Start: ast.Position{
 												Column: 59,
-												Line:   84,
+												Line:   148,
 											},
 										},
 									},
@@ -2939,13 +3382,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 63,
-													Line:   84,
+													Line:   148,
 												},
 												File:   "pagerduty.flux",
 												Source: "data",
 												Start: ast.Position{
 													Column: 59,
-													Line:   84,
+													Line:   148,
 												},
 											},
 										},
@@ -2959,13 +3402,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 68,
-													Line:   84,
+													Line:   148,
 												},
 												File:   "pagerduty.flux",
 												Source: "enc",
 												Start: ast.Position{
 													Column: 65,
-													Line:   84,
+													Line:   148,
 												},
 											},
 										},
@@ -2981,13 +3424,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 69,
-										Line:   84,
+										Line:   148,
 									},
 									File:   "pagerduty.flux",
 									Source: "http.post(headers: headers, url: pagerdutyURL, data: enc)",
 									Start: ast.Position{
 										Column: 12,
-										Line:   84,
+										Line:   148,
 									},
 								},
 							},
@@ -2998,13 +3441,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 21,
-											Line:   84,
+											Line:   148,
 										},
 										File:   "pagerduty.flux",
 										Source: "http.post",
 										Start: ast.Position{
 											Column: 12,
-											Line:   84,
+											Line:   148,
 										},
 									},
 								},
@@ -3016,13 +3459,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 16,
-												Line:   84,
+												Line:   148,
 											},
 											File:   "pagerduty.flux",
 											Source: "http",
 											Start: ast.Position{
 												Column: 12,
-												Line:   84,
+												Line:   148,
 											},
 										},
 									},
@@ -3035,13 +3478,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 21,
-												Line:   84,
+												Line:   148,
 											},
 											File:   "pagerduty.flux",
 											Source: "post",
 											Start: ast.Position{
 												Column: 17,
-												Line:   84,
+												Line:   148,
 											},
 										},
 									},
@@ -3058,13 +3501,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 69,
-									Line:   84,
+									Line:   148,
 								},
 								File:   "pagerduty.flux",
 								Source: "return http.post(headers: headers, url: pagerdutyURL, data: enc)",
 								Start: ast.Position{
 									Column: 5,
-									Line:   84,
+									Line:   148,
 								},
 							},
 						},
@@ -3080,13 +3523,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 32,
-								Line:   49,
+								Line:   113,
 							},
 							File:   "pagerduty.flux",
 							Source: "pagerdutyURL=defaultURL",
 							Start: ast.Position{
 								Column: 9,
-								Line:   49,
+								Line:   113,
 							},
 						},
 					},
@@ -3098,13 +3541,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 21,
-									Line:   49,
+									Line:   113,
 								},
 								File:   "pagerduty.flux",
 								Source: "pagerdutyURL",
 								Start: ast.Position{
 									Column: 9,
-									Line:   49,
+									Line:   113,
 								},
 							},
 						},
@@ -3118,13 +3561,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 32,
-									Line:   49,
+									Line:   113,
 								},
 								File:   "pagerduty.flux",
 								Source: "defaultURL",
 								Start: ast.Position{
 									Column: 22,
-									Line:   49,
+									Line:   113,
 								},
 							},
 						},
@@ -3137,13 +3580,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 19,
-								Line:   50,
+								Line:   114,
 							},
 							File:   "pagerduty.flux",
 							Source: "routingKey",
 							Start: ast.Position{
 								Column: 9,
-								Line:   50,
+								Line:   114,
 							},
 						},
 					},
@@ -3155,13 +3598,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 19,
-									Line:   50,
+									Line:   114,
 								},
 								File:   "pagerduty.flux",
 								Source: "routingKey",
 								Start: ast.Position{
 									Column: 9,
-									Line:   50,
+									Line:   114,
 								},
 							},
 						},
@@ -3176,13 +3619,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 15,
-								Line:   51,
+								Line:   115,
 							},
 							File:   "pagerduty.flux",
 							Source: "client",
 							Start: ast.Position{
 								Column: 9,
-								Line:   51,
+								Line:   115,
 							},
 						},
 					},
@@ -3194,13 +3637,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 15,
-									Line:   51,
+									Line:   115,
 								},
 								File:   "pagerduty.flux",
 								Source: "client",
 								Start: ast.Position{
 									Column: 9,
-									Line:   51,
+									Line:   115,
 								},
 							},
 						},
@@ -3215,13 +3658,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 18,
-								Line:   52,
+								Line:   116,
 							},
 							File:   "pagerduty.flux",
 							Source: "clientURL",
 							Start: ast.Position{
 								Column: 9,
-								Line:   52,
+								Line:   116,
 							},
 						},
 					},
@@ -3233,13 +3676,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 18,
-									Line:   52,
+									Line:   116,
 								},
 								File:   "pagerduty.flux",
 								Source: "clientURL",
 								Start: ast.Position{
 									Column: 9,
-									Line:   52,
+									Line:   116,
 								},
 							},
 						},
@@ -3254,13 +3697,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 17,
-								Line:   53,
+								Line:   117,
 							},
 							File:   "pagerduty.flux",
 							Source: "dedupKey",
 							Start: ast.Position{
 								Column: 9,
-								Line:   53,
+								Line:   117,
 							},
 						},
 					},
@@ -3272,13 +3715,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 17,
-									Line:   53,
+									Line:   117,
 								},
 								File:   "pagerduty.flux",
 								Source: "dedupKey",
 								Start: ast.Position{
 									Column: 9,
-									Line:   53,
+									Line:   117,
 								},
 							},
 						},
@@ -3293,13 +3736,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 14,
-								Line:   54,
+								Line:   118,
 							},
 							File:   "pagerduty.flux",
 							Source: "class",
 							Start: ast.Position{
 								Column: 9,
-								Line:   54,
+								Line:   118,
 							},
 						},
 					},
@@ -3311,13 +3754,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 14,
-									Line:   54,
+									Line:   118,
 								},
 								File:   "pagerduty.flux",
 								Source: "class",
 								Start: ast.Position{
 									Column: 9,
-									Line:   54,
+									Line:   118,
 								},
 							},
 						},
@@ -3332,13 +3775,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 14,
-								Line:   55,
+								Line:   119,
 							},
 							File:   "pagerduty.flux",
 							Source: "group",
 							Start: ast.Position{
 								Column: 9,
-								Line:   55,
+								Line:   119,
 							},
 						},
 					},
@@ -3350,13 +3793,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 14,
-									Line:   55,
+									Line:   119,
 								},
 								File:   "pagerduty.flux",
 								Source: "group",
 								Start: ast.Position{
 									Column: 9,
-									Line:   55,
+									Line:   119,
 								},
 							},
 						},
@@ -3371,13 +3814,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 17,
-								Line:   56,
+								Line:   120,
 							},
 							File:   "pagerduty.flux",
 							Source: "severity",
 							Start: ast.Position{
 								Column: 9,
-								Line:   56,
+								Line:   120,
 							},
 						},
 					},
@@ -3389,13 +3832,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 17,
-									Line:   56,
+									Line:   120,
 								},
 								File:   "pagerduty.flux",
 								Source: "severity",
 								Start: ast.Position{
 									Column: 9,
-									Line:   56,
+									Line:   120,
 								},
 							},
 						},
@@ -3410,13 +3853,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 20,
-								Line:   57,
+								Line:   121,
 							},
 							File:   "pagerduty.flux",
 							Source: "eventAction",
 							Start: ast.Position{
 								Column: 9,
-								Line:   57,
+								Line:   121,
 							},
 						},
 					},
@@ -3428,13 +3871,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 20,
-									Line:   57,
+									Line:   121,
 								},
 								File:   "pagerduty.flux",
 								Source: "eventAction",
 								Start: ast.Position{
 									Column: 9,
-									Line:   57,
+									Line:   121,
 								},
 							},
 						},
@@ -3449,13 +3892,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 15,
-								Line:   58,
+								Line:   122,
 							},
 							File:   "pagerduty.flux",
 							Source: "source",
 							Start: ast.Position{
 								Column: 9,
-								Line:   58,
+								Line:   122,
 							},
 						},
 					},
@@ -3467,13 +3910,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 15,
-									Line:   58,
+									Line:   122,
 								},
 								File:   "pagerduty.flux",
 								Source: "source",
 								Start: ast.Position{
 									Column: 9,
-									Line:   58,
+									Line:   122,
 								},
 							},
 						},
@@ -3488,13 +3931,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 16,
-								Line:   59,
+								Line:   123,
 							},
 							File:   "pagerduty.flux",
 							Source: "summary",
 							Start: ast.Position{
 								Column: 9,
-								Line:   59,
+								Line:   123,
 							},
 						},
 					},
@@ -3506,13 +3949,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 16,
-									Line:   59,
+									Line:   123,
 								},
 								File:   "pagerduty.flux",
 								Source: "summary",
 								Start: ast.Position{
 									Column: 9,
-									Line:   59,
+									Line:   123,
 								},
 							},
 						},
@@ -3527,13 +3970,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 18,
-								Line:   60,
+								Line:   124,
 							},
 							File:   "pagerduty.flux",
 							Source: "timestamp",
 							Start: ast.Position{
 								Column: 9,
-								Line:   60,
+								Line:   124,
 							},
 						},
 					},
@@ -3545,13 +3988,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 18,
-									Line:   60,
+									Line:   124,
 								},
 								File:   "pagerduty.flux",
 								Source: "timestamp",
 								Start: ast.Position{
 									Column: 9,
-									Line:   60,
+									Line:   124,
 								},
 							},
 						},
@@ -3569,30 +4012,30 @@ var pkgAST = &ast.Package{
 				Loc: &ast.SourceLocation{
 					End: ast.Position{
 						Column: 6,
-						Line:   117,
+						Line:   232,
 					},
 					File:   "pagerduty.flux",
 					Source: "endpoint = (url=defaultURL) => (mapFn) => (tables=<-) => tables\n    |> dedupKey()\n    |> map(\n        fn: (r) => {\n            obj = mapFn(r: r)\n\n            return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }\n        },\n    )",
 					Start: ast.Position{
 						Column: 1,
-						Line:   92,
+						Line:   207,
 					},
 				},
 			},
 			ID: &ast.Identifier{
 				BaseNode: ast.BaseNode{
-					Comments: []ast.Comment{ast.Comment{Text: "// `endpoint` creates the endpoint for the PagerDuty external service.\n"}, ast.Comment{Text: "// `url` - string - URL of the Pagerduty endpoint. Defaults to: \"https://events.pagerduty.com/v2/enqueue\".\n"}, ast.Comment{Text: "// The returned factory function accepts a `mapFn` parameter.\n"}, ast.Comment{Text: "// The `mapFn` parameter must be a function that returns an object with `routingKey`, `client`, `client_url`, `class`, `group`, `severity`, `eventAction`, `source`, `summary`, and `timestamp` as defined in the sendEvent function.\n"}, ast.Comment{Text: "// Note that while sendEvent accepts a dedup key, endpoint gets the dedupkey from the groupkey of the input table instead of it being handled by the `mapFn`.\n"}},
+					Comments: []ast.Comment{ast.Comment{Text: "// endpoint returns a function that can be used to send a message to PagerDuty that includes output data.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// ## Parameters\n"}, ast.Comment{Text: "// - `url` is the The PagerDuty v2 Events API URL.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "//      Defaults to https://events.pagerduty.com/v2/enqueue.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// - `Usage` the pagerduty.endpoint is a factory function that outputs another function.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "//      The output function requires a mapFn parameter.\n"}, ast.Comment{Text: "//      See the PagerDuty v2 Events API documentation for more information about these parameters.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// - `mapFn` is a function that builds the record used to generate the POST request. Requires an r parameter.\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "//      mapFn accepts a table row (r) and returns a record that must include the following fields:\n"}, ast.Comment{Text: "//         routingKey\n"}, ast.Comment{Text: "//         client\n"}, ast.Comment{Text: "//         client_url\n"}, ast.Comment{Text: "//         class\n"}, ast.Comment{Text: "//         eventAction\n"}, ast.Comment{Text: "//         group\n"}, ast.Comment{Text: "//         severity\n"}, ast.Comment{Text: "//         component\n"}, ast.Comment{Text: "//         source\n"}, ast.Comment{Text: "//         summary\n"}, ast.Comment{Text: "//         timestamp\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// ## Send critical statuses to a PagerDuty endpoint\n"}, ast.Comment{Text: "// ```\n"}, ast.Comment{Text: "// import \"pagerduty\"\n"}, ast.Comment{Text: "// import \"influxdata/influxdb/secrets\"\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// routingKey = secrets.get(key: \"PAGERDUTY_ROUTING_KEY\")\n"}, ast.Comment{Text: "// toPagerDuty = pagerduty.endpoint()\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// crit_statuses = from(bucket: \"example-bucket\")\n"}, ast.Comment{Text: "//   |> range(start: -1m)\n"}, ast.Comment{Text: "//   |> filter(fn: (r) => r._measurement == \"statuses\" and r.status == \"crit\")\n"}, ast.Comment{Text: "//\n"}, ast.Comment{Text: "// crit_statuses\n"}, ast.Comment{Text: "//   |> toPagerDuty(mapFn: (r) => ({ r with\n"}, ast.Comment{Text: "//       routingKey: routingKey,\n"}, ast.Comment{Text: "//       client: r.client,\n"}, ast.Comment{Text: "//       clientURL: r.clientURL,\n"}, ast.Comment{Text: "//       class: r.class,\n"}, ast.Comment{Text: "//       eventAction: r.eventAction,\n"}, ast.Comment{Text: "//       group: r.group,\n"}, ast.Comment{Text: "//       severity: r.severity,\n"}, ast.Comment{Text: "//       component: r.component,\n"}, ast.Comment{Text: "//       source: r.source,\n"}, ast.Comment{Text: "//       summary: r.summary,\n"}, ast.Comment{Text: "//       timestamp: r._time,\n"}, ast.Comment{Text: "//     })\n"}, ast.Comment{Text: "//   )()\n"}, ast.Comment{Text: "// ```\n"}, ast.Comment{Text: "//\n"}},
 					Errors:   nil,
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 9,
-							Line:   92,
+							Line:   207,
 						},
 						File:   "pagerduty.flux",
 						Source: "endpoint",
 						Start: ast.Position{
 							Column: 1,
-							Line:   92,
+							Line:   207,
 						},
 					},
 				},
@@ -3606,13 +4049,13 @@ var pkgAST = &ast.Package{
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 6,
-							Line:   117,
+							Line:   232,
 						},
 						File:   "pagerduty.flux",
 						Source: "(url=defaultURL) => (mapFn) => (tables=<-) => tables\n    |> dedupKey()\n    |> map(\n        fn: (r) => {\n            obj = mapFn(r: r)\n\n            return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }\n        },\n    )",
 						Start: ast.Position{
 							Column: 12,
-							Line:   92,
+							Line:   207,
 						},
 					},
 				},
@@ -3624,13 +4067,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 6,
-								Line:   117,
+								Line:   232,
 							},
 							File:   "pagerduty.flux",
 							Source: "(mapFn) => (tables=<-) => tables\n    |> dedupKey()\n    |> map(\n        fn: (r) => {\n            obj = mapFn(r: r)\n\n            return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }\n        },\n    )",
 							Start: ast.Position{
 								Column: 32,
-								Line:   92,
+								Line:   207,
 							},
 						},
 					},
@@ -3642,13 +4085,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 6,
-									Line:   117,
+									Line:   232,
 								},
 								File:   "pagerduty.flux",
 								Source: "(tables=<-) => tables\n    |> dedupKey()\n    |> map(\n        fn: (r) => {\n            obj = mapFn(r: r)\n\n            return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }\n        },\n    )",
 								Start: ast.Position{
 									Column: 43,
-									Line:   92,
+									Line:   207,
 								},
 							},
 						},
@@ -3661,13 +4104,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 64,
-												Line:   92,
+												Line:   207,
 											},
 											File:   "pagerduty.flux",
 											Source: "tables",
 											Start: ast.Position{
 												Column: 58,
-												Line:   92,
+												Line:   207,
 											},
 										},
 									},
@@ -3679,13 +4122,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 18,
-											Line:   93,
+											Line:   208,
 										},
 										File:   "pagerduty.flux",
 										Source: "tables\n    |> dedupKey()",
 										Start: ast.Position{
 											Column: 58,
-											Line:   92,
+											Line:   207,
 										},
 									},
 								},
@@ -3697,13 +4140,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 18,
-												Line:   93,
+												Line:   208,
 											},
 											File:   "pagerduty.flux",
 											Source: "dedupKey()",
 											Start: ast.Position{
 												Column: 8,
-												Line:   93,
+												Line:   208,
 											},
 										},
 									},
@@ -3714,13 +4157,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 16,
-													Line:   93,
+													Line:   208,
 												},
 												File:   "pagerduty.flux",
 												Source: "dedupKey",
 												Start: ast.Position{
 													Column: 8,
-													Line:   93,
+													Line:   208,
 												},
 											},
 										},
@@ -3736,13 +4179,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 6,
-										Line:   117,
+										Line:   232,
 									},
 									File:   "pagerduty.flux",
 									Source: "tables\n    |> dedupKey()\n    |> map(\n        fn: (r) => {\n            obj = mapFn(r: r)\n\n            return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }\n        },\n    )",
 									Start: ast.Position{
 										Column: 58,
-										Line:   92,
+										Line:   207,
 									},
 								},
 							},
@@ -3754,13 +4197,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 10,
-												Line:   116,
+												Line:   231,
 											},
 											File:   "pagerduty.flux",
 											Source: "fn: (r) => {\n            obj = mapFn(r: r)\n\n            return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }\n        }",
 											Start: ast.Position{
 												Column: 9,
-												Line:   95,
+												Line:   210,
 											},
 										},
 									},
@@ -3772,13 +4215,13 @@ var pkgAST = &ast.Package{
 											Loc: &ast.SourceLocation{
 												End: ast.Position{
 													Column: 10,
-													Line:   116,
+													Line:   231,
 												},
 												File:   "pagerduty.flux",
 												Source: "fn: (r) => {\n            obj = mapFn(r: r)\n\n            return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }\n        }",
 												Start: ast.Position{
 													Column: 9,
-													Line:   95,
+													Line:   210,
 												},
 											},
 										},
@@ -3790,13 +4233,13 @@ var pkgAST = &ast.Package{
 												Loc: &ast.SourceLocation{
 													End: ast.Position{
 														Column: 11,
-														Line:   95,
+														Line:   210,
 													},
 													File:   "pagerduty.flux",
 													Source: "fn",
 													Start: ast.Position{
 														Column: 9,
-														Line:   95,
+														Line:   210,
 													},
 												},
 											},
@@ -3811,13 +4254,13 @@ var pkgAST = &ast.Package{
 												Loc: &ast.SourceLocation{
 													End: ast.Position{
 														Column: 10,
-														Line:   116,
+														Line:   231,
 													},
 													File:   "pagerduty.flux",
 													Source: "(r) => {\n            obj = mapFn(r: r)\n\n            return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }\n        }",
 													Start: ast.Position{
 														Column: 13,
-														Line:   95,
+														Line:   210,
 													},
 												},
 											},
@@ -3828,13 +4271,13 @@ var pkgAST = &ast.Package{
 													Loc: &ast.SourceLocation{
 														End: ast.Position{
 															Column: 10,
-															Line:   116,
+															Line:   231,
 														},
 														File:   "pagerduty.flux",
 														Source: "{\n            obj = mapFn(r: r)\n\n            return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }\n        }",
 														Start: ast.Position{
 															Column: 20,
-															Line:   95,
+															Line:   210,
 														},
 													},
 												},
@@ -3845,13 +4288,13 @@ var pkgAST = &ast.Package{
 														Loc: &ast.SourceLocation{
 															End: ast.Position{
 																Column: 30,
-																Line:   96,
+																Line:   211,
 															},
 															File:   "pagerduty.flux",
 															Source: "obj = mapFn(r: r)",
 															Start: ast.Position{
 																Column: 13,
-																Line:   96,
+																Line:   211,
 															},
 														},
 													},
@@ -3862,13 +4305,13 @@ var pkgAST = &ast.Package{
 															Loc: &ast.SourceLocation{
 																End: ast.Position{
 																	Column: 16,
-																	Line:   96,
+																	Line:   211,
 																},
 																File:   "pagerduty.flux",
 																Source: "obj",
 																Start: ast.Position{
 																	Column: 13,
-																	Line:   96,
+																	Line:   211,
 																},
 															},
 														},
@@ -3882,13 +4325,13 @@ var pkgAST = &ast.Package{
 																Loc: &ast.SourceLocation{
 																	End: ast.Position{
 																		Column: 29,
-																		Line:   96,
+																		Line:   211,
 																	},
 																	File:   "pagerduty.flux",
 																	Source: "r: r",
 																	Start: ast.Position{
 																		Column: 25,
-																		Line:   96,
+																		Line:   211,
 																	},
 																},
 															},
@@ -3900,13 +4343,13 @@ var pkgAST = &ast.Package{
 																	Loc: &ast.SourceLocation{
 																		End: ast.Position{
 																			Column: 29,
-																			Line:   96,
+																			Line:   211,
 																		},
 																		File:   "pagerduty.flux",
 																		Source: "r: r",
 																		Start: ast.Position{
 																			Column: 25,
-																			Line:   96,
+																			Line:   211,
 																		},
 																	},
 																},
@@ -3918,13 +4361,13 @@ var pkgAST = &ast.Package{
 																		Loc: &ast.SourceLocation{
 																			End: ast.Position{
 																				Column: 26,
-																				Line:   96,
+																				Line:   211,
 																			},
 																			File:   "pagerduty.flux",
 																			Source: "r",
 																			Start: ast.Position{
 																				Column: 25,
-																				Line:   96,
+																				Line:   211,
 																			},
 																		},
 																	},
@@ -3938,13 +4381,13 @@ var pkgAST = &ast.Package{
 																		Loc: &ast.SourceLocation{
 																			End: ast.Position{
 																				Column: 29,
-																				Line:   96,
+																				Line:   211,
 																			},
 																			File:   "pagerduty.flux",
 																			Source: "r",
 																			Start: ast.Position{
 																				Column: 28,
-																				Line:   96,
+																				Line:   211,
 																			},
 																		},
 																	},
@@ -3960,13 +4403,13 @@ var pkgAST = &ast.Package{
 															Loc: &ast.SourceLocation{
 																End: ast.Position{
 																	Column: 30,
-																	Line:   96,
+																	Line:   211,
 																},
 																File:   "pagerduty.flux",
 																Source: "mapFn(r: r)",
 																Start: ast.Position{
 																	Column: 19,
-																	Line:   96,
+																	Line:   211,
 																},
 															},
 														},
@@ -3977,13 +4420,13 @@ var pkgAST = &ast.Package{
 																Loc: &ast.SourceLocation{
 																	End: ast.Position{
 																		Column: 24,
-																		Line:   96,
+																		Line:   211,
 																	},
 																	File:   "pagerduty.flux",
 																	Source: "mapFn",
 																	Start: ast.Position{
 																		Column: 19,
-																		Line:   96,
+																		Line:   211,
 																	},
 																},
 															},
@@ -4000,13 +4443,13 @@ var pkgAST = &ast.Package{
 															Loc: &ast.SourceLocation{
 																End: ast.Position{
 																	Column: 14,
-																	Line:   115,
+																	Line:   230,
 																},
 																File:   "pagerduty.flux",
 																Source: "{r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }",
 																Start: ast.Position{
 																	Column: 20,
-																	Line:   98,
+																	Line:   213,
 																},
 															},
 														},
@@ -4018,13 +4461,13 @@ var pkgAST = &ast.Package{
 																Loc: &ast.SourceLocation{
 																	End: ast.Position{
 																		Column: 18,
-																		Line:   114,
+																		Line:   229,
 																	},
 																	File:   "pagerduty.flux",
 																	Source: "_sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                )",
 																	Start: ast.Position{
 																		Column: 17,
-																		Line:   99,
+																		Line:   214,
 																	},
 																},
 															},
@@ -4036,13 +4479,13 @@ var pkgAST = &ast.Package{
 																	Loc: &ast.SourceLocation{
 																		End: ast.Position{
 																			Column: 22,
-																			Line:   99,
+																			Line:   214,
 																		},
 																		File:   "pagerduty.flux",
 																		Source: "_sent",
 																		Start: ast.Position{
 																			Column: 17,
-																			Line:   99,
+																			Line:   214,
 																		},
 																	},
 																},
@@ -4057,13 +4500,13 @@ var pkgAST = &ast.Package{
 																		Loc: &ast.SourceLocation{
 																			End: ast.Position{
 																				Column: 28,
-																				Line:   113,
+																				Line:   228,
 																			},
 																			File:   "pagerduty.flux",
 																			Source: "v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100",
 																			Start: ast.Position{
 																				Column: 21,
-																				Line:   100,
+																				Line:   215,
 																			},
 																		},
 																	},
@@ -4075,13 +4518,13 @@ var pkgAST = &ast.Package{
 																			Loc: &ast.SourceLocation{
 																				End: ast.Position{
 																					Column: 28,
-																					Line:   113,
+																					Line:   228,
 																				},
 																				File:   "pagerduty.flux",
 																				Source: "v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100",
 																				Start: ast.Position{
 																					Column: 21,
-																					Line:   100,
+																					Line:   215,
 																				},
 																			},
 																		},
@@ -4093,13 +4536,13 @@ var pkgAST = &ast.Package{
 																				Loc: &ast.SourceLocation{
 																					End: ast.Position{
 																						Column: 22,
-																						Line:   100,
+																						Line:   215,
 																					},
 																					File:   "pagerduty.flux",
 																					Source: "v",
 																					Start: ast.Position{
 																						Column: 21,
-																						Line:   100,
+																						Line:   215,
 																					},
 																				},
 																			},
@@ -4113,13 +4556,13 @@ var pkgAST = &ast.Package{
 																				Loc: &ast.SourceLocation{
 																					End: ast.Position{
 																						Column: 28,
-																						Line:   113,
+																						Line:   228,
 																					},
 																					File:   "pagerduty.flux",
 																					Source: "2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100",
 																					Start: ast.Position{
 																						Column: 24,
-																						Line:   100,
+																						Line:   215,
 																					},
 																				},
 																			},
@@ -4130,13 +4573,13 @@ var pkgAST = &ast.Package{
 																					Loc: &ast.SourceLocation{
 																						End: ast.Position{
 																							Column: 25,
-																							Line:   100,
+																							Line:   215,
 																						},
 																						File:   "pagerduty.flux",
 																						Source: "2",
 																						Start: ast.Position{
 																							Column: 24,
-																							Line:   100,
+																							Line:   215,
 																						},
 																					},
 																				},
@@ -4150,13 +4593,13 @@ var pkgAST = &ast.Package{
 																					Loc: &ast.SourceLocation{
 																						End: ast.Position{
 																							Column: 28,
-																							Line:   113,
+																							Line:   228,
 																						},
 																						File:   "pagerduty.flux",
 																						Source: "sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100",
 																						Start: ast.Position{
 																							Column: 29,
-																							Line:   100,
+																							Line:   215,
 																						},
 																					},
 																				},
@@ -4168,13 +4611,13 @@ var pkgAST = &ast.Package{
 																							Loc: &ast.SourceLocation{
 																								End: ast.Position{
 																									Column: 49,
-																									Line:   112,
+																									Line:   227,
 																								},
 																								File:   "pagerduty.flux",
 																								Source: "pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp",
 																								Start: ast.Position{
 																									Column: 25,
-																									Line:   101,
+																									Line:   216,
 																								},
 																							},
 																						},
@@ -4186,13 +4629,13 @@ var pkgAST = &ast.Package{
 																								Loc: &ast.SourceLocation{
 																									End: ast.Position{
 																										Column: 42,
-																										Line:   101,
+																										Line:   216,
 																									},
 																									File:   "pagerduty.flux",
 																									Source: "pagerdutyURL: url",
 																									Start: ast.Position{
 																										Column: 25,
-																										Line:   101,
+																										Line:   216,
 																									},
 																								},
 																							},
@@ -4204,13 +4647,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 37,
-																											Line:   101,
+																											Line:   216,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "pagerdutyURL",
 																										Start: ast.Position{
 																											Column: 25,
-																											Line:   101,
+																											Line:   216,
 																										},
 																									},
 																								},
@@ -4224,13 +4667,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 42,
-																											Line:   101,
+																											Line:   216,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "url",
 																										Start: ast.Position{
 																											Column: 39,
-																											Line:   101,
+																											Line:   216,
 																										},
 																									},
 																								},
@@ -4243,13 +4686,13 @@ var pkgAST = &ast.Package{
 																								Loc: &ast.SourceLocation{
 																									End: ast.Position{
 																										Column: 51,
-																										Line:   102,
+																										Line:   217,
 																									},
 																									File:   "pagerduty.flux",
 																									Source: "routingKey: obj.routingKey",
 																									Start: ast.Position{
 																										Column: 25,
-																										Line:   102,
+																										Line:   217,
 																									},
 																								},
 																							},
@@ -4261,13 +4704,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 35,
-																											Line:   102,
+																											Line:   217,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "routingKey",
 																										Start: ast.Position{
 																											Column: 25,
-																											Line:   102,
+																											Line:   217,
 																										},
 																									},
 																								},
@@ -4281,13 +4724,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 51,
-																											Line:   102,
+																											Line:   217,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "obj.routingKey",
 																										Start: ast.Position{
 																											Column: 37,
-																											Line:   102,
+																											Line:   217,
 																										},
 																									},
 																								},
@@ -4299,13 +4742,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 40,
-																												Line:   102,
+																												Line:   217,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "obj",
 																											Start: ast.Position{
 																												Column: 37,
-																												Line:   102,
+																												Line:   217,
 																											},
 																										},
 																									},
@@ -4318,13 +4761,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 51,
-																												Line:   102,
+																												Line:   217,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "routingKey",
 																											Start: ast.Position{
 																												Column: 41,
-																												Line:   102,
+																												Line:   217,
 																											},
 																										},
 																									},
@@ -4339,13 +4782,13 @@ var pkgAST = &ast.Package{
 																								Loc: &ast.SourceLocation{
 																									End: ast.Position{
 																										Column: 43,
-																										Line:   103,
+																										Line:   218,
 																									},
 																									File:   "pagerduty.flux",
 																									Source: "client: obj.client",
 																									Start: ast.Position{
 																										Column: 25,
-																										Line:   103,
+																										Line:   218,
 																									},
 																								},
 																							},
@@ -4357,13 +4800,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 31,
-																											Line:   103,
+																											Line:   218,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "client",
 																										Start: ast.Position{
 																											Column: 25,
-																											Line:   103,
+																											Line:   218,
 																										},
 																									},
 																								},
@@ -4377,13 +4820,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 43,
-																											Line:   103,
+																											Line:   218,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "obj.client",
 																										Start: ast.Position{
 																											Column: 33,
-																											Line:   103,
+																											Line:   218,
 																										},
 																									},
 																								},
@@ -4395,13 +4838,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 36,
-																												Line:   103,
+																												Line:   218,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "obj",
 																											Start: ast.Position{
 																												Column: 33,
-																												Line:   103,
+																												Line:   218,
 																											},
 																										},
 																									},
@@ -4414,13 +4857,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 43,
-																												Line:   103,
+																												Line:   218,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "client",
 																											Start: ast.Position{
 																												Column: 37,
-																												Line:   103,
+																												Line:   218,
 																											},
 																										},
 																									},
@@ -4435,13 +4878,13 @@ var pkgAST = &ast.Package{
 																								Loc: &ast.SourceLocation{
 																									End: ast.Position{
 																										Column: 49,
-																										Line:   104,
+																										Line:   219,
 																									},
 																									File:   "pagerduty.flux",
 																									Source: "clientURL: obj.clientURL",
 																									Start: ast.Position{
 																										Column: 25,
-																										Line:   104,
+																										Line:   219,
 																									},
 																								},
 																							},
@@ -4453,13 +4896,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 34,
-																											Line:   104,
+																											Line:   219,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "clientURL",
 																										Start: ast.Position{
 																											Column: 25,
-																											Line:   104,
+																											Line:   219,
 																										},
 																									},
 																								},
@@ -4473,13 +4916,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 49,
-																											Line:   104,
+																											Line:   219,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "obj.clientURL",
 																										Start: ast.Position{
 																											Column: 36,
-																											Line:   104,
+																											Line:   219,
 																										},
 																									},
 																								},
@@ -4491,13 +4934,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 39,
-																												Line:   104,
+																												Line:   219,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "obj",
 																											Start: ast.Position{
 																												Column: 36,
-																												Line:   104,
+																												Line:   219,
 																											},
 																										},
 																									},
@@ -4510,13 +4953,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 49,
-																												Line:   104,
+																												Line:   219,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "clientURL",
 																											Start: ast.Position{
 																												Column: 40,
-																												Line:   104,
+																												Line:   219,
 																											},
 																										},
 																									},
@@ -4531,13 +4974,13 @@ var pkgAST = &ast.Package{
 																								Loc: &ast.SourceLocation{
 																									End: ast.Position{
 																										Column: 55,
-																										Line:   105,
+																										Line:   220,
 																									},
 																									File:   "pagerduty.flux",
 																									Source: "dedupKey: r._pagerdutyDedupKey",
 																									Start: ast.Position{
 																										Column: 25,
-																										Line:   105,
+																										Line:   220,
 																									},
 																								},
 																							},
@@ -4549,13 +4992,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 33,
-																											Line:   105,
+																											Line:   220,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "dedupKey",
 																										Start: ast.Position{
 																											Column: 25,
-																											Line:   105,
+																											Line:   220,
 																										},
 																									},
 																								},
@@ -4569,13 +5012,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 55,
-																											Line:   105,
+																											Line:   220,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "r._pagerdutyDedupKey",
 																										Start: ast.Position{
 																											Column: 35,
-																											Line:   105,
+																											Line:   220,
 																										},
 																									},
 																								},
@@ -4587,13 +5030,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 36,
-																												Line:   105,
+																												Line:   220,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "r",
 																											Start: ast.Position{
 																												Column: 35,
-																												Line:   105,
+																												Line:   220,
 																											},
 																										},
 																									},
@@ -4606,13 +5049,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 55,
-																												Line:   105,
+																												Line:   220,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "_pagerdutyDedupKey",
 																											Start: ast.Position{
 																												Column: 37,
-																												Line:   105,
+																												Line:   220,
 																											},
 																										},
 																									},
@@ -4627,13 +5070,13 @@ var pkgAST = &ast.Package{
 																								Loc: &ast.SourceLocation{
 																									End: ast.Position{
 																										Column: 41,
-																										Line:   106,
+																										Line:   221,
 																									},
 																									File:   "pagerduty.flux",
 																									Source: "class: obj.class",
 																									Start: ast.Position{
 																										Column: 25,
-																										Line:   106,
+																										Line:   221,
 																									},
 																								},
 																							},
@@ -4645,13 +5088,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 30,
-																											Line:   106,
+																											Line:   221,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "class",
 																										Start: ast.Position{
 																											Column: 25,
-																											Line:   106,
+																											Line:   221,
 																										},
 																									},
 																								},
@@ -4665,13 +5108,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 41,
-																											Line:   106,
+																											Line:   221,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "obj.class",
 																										Start: ast.Position{
 																											Column: 32,
-																											Line:   106,
+																											Line:   221,
 																										},
 																									},
 																								},
@@ -4683,13 +5126,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 35,
-																												Line:   106,
+																												Line:   221,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "obj",
 																											Start: ast.Position{
 																												Column: 32,
-																												Line:   106,
+																												Line:   221,
 																											},
 																										},
 																									},
@@ -4702,13 +5145,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 41,
-																												Line:   106,
+																												Line:   221,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "class",
 																											Start: ast.Position{
 																												Column: 36,
-																												Line:   106,
+																												Line:   221,
 																											},
 																										},
 																									},
@@ -4723,13 +5166,13 @@ var pkgAST = &ast.Package{
 																								Loc: &ast.SourceLocation{
 																									End: ast.Position{
 																										Column: 41,
-																										Line:   107,
+																										Line:   222,
 																									},
 																									File:   "pagerduty.flux",
 																									Source: "group: obj.group",
 																									Start: ast.Position{
 																										Column: 25,
-																										Line:   107,
+																										Line:   222,
 																									},
 																								},
 																							},
@@ -4741,13 +5184,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 30,
-																											Line:   107,
+																											Line:   222,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "group",
 																										Start: ast.Position{
 																											Column: 25,
-																											Line:   107,
+																											Line:   222,
 																										},
 																									},
 																								},
@@ -4761,13 +5204,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 41,
-																											Line:   107,
+																											Line:   222,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "obj.group",
 																										Start: ast.Position{
 																											Column: 32,
-																											Line:   107,
+																											Line:   222,
 																										},
 																									},
 																								},
@@ -4779,13 +5222,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 35,
-																												Line:   107,
+																												Line:   222,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "obj",
 																											Start: ast.Position{
 																												Column: 32,
-																												Line:   107,
+																												Line:   222,
 																											},
 																										},
 																									},
@@ -4798,13 +5241,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 41,
-																												Line:   107,
+																												Line:   222,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "group",
 																											Start: ast.Position{
 																												Column: 36,
-																												Line:   107,
+																												Line:   222,
 																											},
 																										},
 																									},
@@ -4819,13 +5262,13 @@ var pkgAST = &ast.Package{
 																								Loc: &ast.SourceLocation{
 																									End: ast.Position{
 																										Column: 47,
-																										Line:   108,
+																										Line:   223,
 																									},
 																									File:   "pagerduty.flux",
 																									Source: "severity: obj.severity",
 																									Start: ast.Position{
 																										Column: 25,
-																										Line:   108,
+																										Line:   223,
 																									},
 																								},
 																							},
@@ -4837,13 +5280,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 33,
-																											Line:   108,
+																											Line:   223,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "severity",
 																										Start: ast.Position{
 																											Column: 25,
-																											Line:   108,
+																											Line:   223,
 																										},
 																									},
 																								},
@@ -4857,13 +5300,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 47,
-																											Line:   108,
+																											Line:   223,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "obj.severity",
 																										Start: ast.Position{
 																											Column: 35,
-																											Line:   108,
+																											Line:   223,
 																										},
 																									},
 																								},
@@ -4875,13 +5318,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 38,
-																												Line:   108,
+																												Line:   223,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "obj",
 																											Start: ast.Position{
 																												Column: 35,
-																												Line:   108,
+																												Line:   223,
 																											},
 																										},
 																									},
@@ -4894,13 +5337,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 47,
-																												Line:   108,
+																												Line:   223,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "severity",
 																											Start: ast.Position{
 																												Column: 39,
-																												Line:   108,
+																												Line:   223,
 																											},
 																										},
 																									},
@@ -4915,13 +5358,13 @@ var pkgAST = &ast.Package{
 																								Loc: &ast.SourceLocation{
 																									End: ast.Position{
 																										Column: 53,
-																										Line:   109,
+																										Line:   224,
 																									},
 																									File:   "pagerduty.flux",
 																									Source: "eventAction: obj.eventAction",
 																									Start: ast.Position{
 																										Column: 25,
-																										Line:   109,
+																										Line:   224,
 																									},
 																								},
 																							},
@@ -4933,13 +5376,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 36,
-																											Line:   109,
+																											Line:   224,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "eventAction",
 																										Start: ast.Position{
 																											Column: 25,
-																											Line:   109,
+																											Line:   224,
 																										},
 																									},
 																								},
@@ -4953,13 +5396,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 53,
-																											Line:   109,
+																											Line:   224,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "obj.eventAction",
 																										Start: ast.Position{
 																											Column: 38,
-																											Line:   109,
+																											Line:   224,
 																										},
 																									},
 																								},
@@ -4971,13 +5414,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 41,
-																												Line:   109,
+																												Line:   224,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "obj",
 																											Start: ast.Position{
 																												Column: 38,
-																												Line:   109,
+																												Line:   224,
 																											},
 																										},
 																									},
@@ -4990,13 +5433,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 53,
-																												Line:   109,
+																												Line:   224,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "eventAction",
 																											Start: ast.Position{
 																												Column: 42,
-																												Line:   109,
+																												Line:   224,
 																											},
 																										},
 																									},
@@ -5011,13 +5454,13 @@ var pkgAST = &ast.Package{
 																								Loc: &ast.SourceLocation{
 																									End: ast.Position{
 																										Column: 43,
-																										Line:   110,
+																										Line:   225,
 																									},
 																									File:   "pagerduty.flux",
 																									Source: "source: obj.source",
 																									Start: ast.Position{
 																										Column: 25,
-																										Line:   110,
+																										Line:   225,
 																									},
 																								},
 																							},
@@ -5029,13 +5472,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 31,
-																											Line:   110,
+																											Line:   225,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "source",
 																										Start: ast.Position{
 																											Column: 25,
-																											Line:   110,
+																											Line:   225,
 																										},
 																									},
 																								},
@@ -5049,13 +5492,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 43,
-																											Line:   110,
+																											Line:   225,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "obj.source",
 																										Start: ast.Position{
 																											Column: 33,
-																											Line:   110,
+																											Line:   225,
 																										},
 																									},
 																								},
@@ -5067,13 +5510,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 36,
-																												Line:   110,
+																												Line:   225,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "obj",
 																											Start: ast.Position{
 																												Column: 33,
-																												Line:   110,
+																												Line:   225,
 																											},
 																										},
 																									},
@@ -5086,13 +5529,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 43,
-																												Line:   110,
+																												Line:   225,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "source",
 																											Start: ast.Position{
 																												Column: 37,
-																												Line:   110,
+																												Line:   225,
 																											},
 																										},
 																									},
@@ -5107,13 +5550,13 @@ var pkgAST = &ast.Package{
 																								Loc: &ast.SourceLocation{
 																									End: ast.Position{
 																										Column: 45,
-																										Line:   111,
+																										Line:   226,
 																									},
 																									File:   "pagerduty.flux",
 																									Source: "summary: obj.summary",
 																									Start: ast.Position{
 																										Column: 25,
-																										Line:   111,
+																										Line:   226,
 																									},
 																								},
 																							},
@@ -5125,13 +5568,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 32,
-																											Line:   111,
+																											Line:   226,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "summary",
 																										Start: ast.Position{
 																											Column: 25,
-																											Line:   111,
+																											Line:   226,
 																										},
 																									},
 																								},
@@ -5145,13 +5588,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 45,
-																											Line:   111,
+																											Line:   226,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "obj.summary",
 																										Start: ast.Position{
 																											Column: 34,
-																											Line:   111,
+																											Line:   226,
 																										},
 																									},
 																								},
@@ -5163,13 +5606,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 37,
-																												Line:   111,
+																												Line:   226,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "obj",
 																											Start: ast.Position{
 																												Column: 34,
-																												Line:   111,
+																												Line:   226,
 																											},
 																										},
 																									},
@@ -5182,13 +5625,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 45,
-																												Line:   111,
+																												Line:   226,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "summary",
 																											Start: ast.Position{
 																												Column: 38,
-																												Line:   111,
+																												Line:   226,
 																											},
 																										},
 																									},
@@ -5203,13 +5646,13 @@ var pkgAST = &ast.Package{
 																								Loc: &ast.SourceLocation{
 																									End: ast.Position{
 																										Column: 49,
-																										Line:   112,
+																										Line:   227,
 																									},
 																									File:   "pagerduty.flux",
 																									Source: "timestamp: obj.timestamp",
 																									Start: ast.Position{
 																										Column: 25,
-																										Line:   112,
+																										Line:   227,
 																									},
 																								},
 																							},
@@ -5221,13 +5664,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 34,
-																											Line:   112,
+																											Line:   227,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "timestamp",
 																										Start: ast.Position{
 																											Column: 25,
-																											Line:   112,
+																											Line:   227,
 																										},
 																									},
 																								},
@@ -5241,13 +5684,13 @@ var pkgAST = &ast.Package{
 																									Loc: &ast.SourceLocation{
 																										End: ast.Position{
 																											Column: 49,
-																											Line:   112,
+																											Line:   227,
 																										},
 																										File:   "pagerduty.flux",
 																										Source: "obj.timestamp",
 																										Start: ast.Position{
 																											Column: 36,
-																											Line:   112,
+																											Line:   227,
 																										},
 																									},
 																								},
@@ -5259,13 +5702,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 39,
-																												Line:   112,
+																												Line:   227,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "obj",
 																											Start: ast.Position{
 																												Column: 36,
-																												Line:   112,
+																												Line:   227,
 																											},
 																										},
 																									},
@@ -5278,13 +5721,13 @@ var pkgAST = &ast.Package{
 																										Loc: &ast.SourceLocation{
 																											End: ast.Position{
 																												Column: 49,
-																												Line:   112,
+																												Line:   227,
 																											},
 																											File:   "pagerduty.flux",
 																											Source: "timestamp",
 																											Start: ast.Position{
 																												Column: 40,
-																												Line:   112,
+																												Line:   227,
 																											},
 																										},
 																									},
@@ -5302,13 +5745,13 @@ var pkgAST = &ast.Package{
 																						Loc: &ast.SourceLocation{
 																							End: ast.Position{
 																								Column: 22,
-																								Line:   113,
+																								Line:   228,
 																							},
 																							File:   "pagerduty.flux",
 																							Source: "sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    )",
 																							Start: ast.Position{
 																								Column: 29,
-																								Line:   100,
+																								Line:   215,
 																							},
 																						},
 																					},
@@ -5319,13 +5762,13 @@ var pkgAST = &ast.Package{
 																							Loc: &ast.SourceLocation{
 																								End: ast.Position{
 																									Column: 38,
-																									Line:   100,
+																									Line:   215,
 																								},
 																								File:   "pagerduty.flux",
 																								Source: "sendEvent",
 																								Start: ast.Position{
 																									Column: 29,
-																									Line:   100,
+																									Line:   215,
 																								},
 																							},
 																						},
@@ -5342,13 +5785,13 @@ var pkgAST = &ast.Package{
 																						Loc: &ast.SourceLocation{
 																							End: ast.Position{
 																								Column: 28,
-																								Line:   113,
+																								Line:   228,
 																							},
 																							File:   "pagerduty.flux",
 																							Source: "100",
 																							Start: ast.Position{
 																								Column: 25,
-																								Line:   113,
+																								Line:   228,
 																							},
 																						},
 																					},
@@ -5366,13 +5809,13 @@ var pkgAST = &ast.Package{
 																	Loc: &ast.SourceLocation{
 																		End: ast.Position{
 																			Column: 18,
-																			Line:   114,
+																			Line:   229,
 																		},
 																		File:   "pagerduty.flux",
 																		Source: "string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                )",
 																		Start: ast.Position{
 																			Column: 24,
-																			Line:   99,
+																			Line:   214,
 																		},
 																	},
 																},
@@ -5383,13 +5826,13 @@ var pkgAST = &ast.Package{
 																		Loc: &ast.SourceLocation{
 																			End: ast.Position{
 																				Column: 30,
-																				Line:   99,
+																				Line:   214,
 																			},
 																			File:   "pagerduty.flux",
 																			Source: "string",
 																			Start: ast.Position{
 																				Column: 24,
-																				Line:   99,
+																				Line:   214,
 																			},
 																		},
 																	},
@@ -5407,13 +5850,13 @@ var pkgAST = &ast.Package{
 																Loc: &ast.SourceLocation{
 																	End: ast.Position{
 																		Column: 22,
-																		Line:   98,
+																		Line:   213,
 																	},
 																	File:   "pagerduty.flux",
 																	Source: "r",
 																	Start: ast.Position{
 																		Column: 21,
-																		Line:   98,
+																		Line:   213,
 																	},
 																},
 															},
@@ -5426,13 +5869,13 @@ var pkgAST = &ast.Package{
 														Loc: &ast.SourceLocation{
 															End: ast.Position{
 																Column: 14,
-																Line:   115,
+																Line:   230,
 															},
 															File:   "pagerduty.flux",
 															Source: "return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }",
 															Start: ast.Position{
 																Column: 13,
-																Line:   98,
+																Line:   213,
 															},
 														},
 													},
@@ -5448,13 +5891,13 @@ var pkgAST = &ast.Package{
 													Loc: &ast.SourceLocation{
 														End: ast.Position{
 															Column: 15,
-															Line:   95,
+															Line:   210,
 														},
 														File:   "pagerduty.flux",
 														Source: "r",
 														Start: ast.Position{
 															Column: 14,
-															Line:   95,
+															Line:   210,
 														},
 													},
 												},
@@ -5466,13 +5909,13 @@ var pkgAST = &ast.Package{
 														Loc: &ast.SourceLocation{
 															End: ast.Position{
 																Column: 15,
-																Line:   95,
+																Line:   210,
 															},
 															File:   "pagerduty.flux",
 															Source: "r",
 															Start: ast.Position{
 																Column: 14,
-																Line:   95,
+																Line:   210,
 															},
 														},
 													},
@@ -5493,13 +5936,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 6,
-											Line:   117,
+											Line:   232,
 										},
 										File:   "pagerduty.flux",
 										Source: "map(\n        fn: (r) => {\n            obj = mapFn(r: r)\n\n            return {r with\n                _sent: string(\n                    v: 2 == sendEvent(\n                        pagerdutyURL: url,\n                        routingKey: obj.routingKey,\n                        client: obj.client,\n                        clientURL: obj.clientURL,\n                        dedupKey: r._pagerdutyDedupKey,\n                        class: obj.class,\n                        group: obj.group,\n                        severity: obj.severity,\n                        eventAction: obj.eventAction,\n                        source: obj.source,\n                        summary: obj.summary,\n                        timestamp: obj.timestamp,\n                    ) / 100,\n                ),\n            }\n        },\n    )",
 										Start: ast.Position{
 											Column: 8,
-											Line:   94,
+											Line:   209,
 										},
 									},
 								},
@@ -5510,13 +5953,13 @@ var pkgAST = &ast.Package{
 										Loc: &ast.SourceLocation{
 											End: ast.Position{
 												Column: 11,
-												Line:   94,
+												Line:   209,
 											},
 											File:   "pagerduty.flux",
 											Source: "map",
 											Start: ast.Position{
 												Column: 8,
-												Line:   94,
+												Line:   209,
 											},
 										},
 									},
@@ -5534,13 +5977,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 53,
-										Line:   92,
+										Line:   207,
 									},
 									File:   "pagerduty.flux",
 									Source: "tables=<-",
 									Start: ast.Position{
 										Column: 44,
-										Line:   92,
+										Line:   207,
 									},
 								},
 							},
@@ -5552,13 +5995,13 @@ var pkgAST = &ast.Package{
 									Loc: &ast.SourceLocation{
 										End: ast.Position{
 											Column: 50,
-											Line:   92,
+											Line:   207,
 										},
 										File:   "pagerduty.flux",
 										Source: "tables",
 										Start: ast.Position{
 											Column: 44,
-											Line:   92,
+											Line:   207,
 										},
 									},
 								},
@@ -5571,13 +6014,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 53,
-										Line:   92,
+										Line:   207,
 									},
 									File:   "pagerduty.flux",
 									Source: "<-",
 									Start: ast.Position{
 										Column: 51,
-										Line:   92,
+										Line:   207,
 									},
 								},
 							}},
@@ -5592,13 +6035,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 38,
-									Line:   92,
+									Line:   207,
 								},
 								File:   "pagerduty.flux",
 								Source: "mapFn",
 								Start: ast.Position{
 									Column: 33,
-									Line:   92,
+									Line:   207,
 								},
 							},
 						},
@@ -5610,13 +6053,13 @@ var pkgAST = &ast.Package{
 								Loc: &ast.SourceLocation{
 									End: ast.Position{
 										Column: 38,
-										Line:   92,
+										Line:   207,
 									},
 									File:   "pagerduty.flux",
 									Source: "mapFn",
 									Start: ast.Position{
 										Column: 33,
-										Line:   92,
+										Line:   207,
 									},
 								},
 							},
@@ -5635,13 +6078,13 @@ var pkgAST = &ast.Package{
 						Loc: &ast.SourceLocation{
 							End: ast.Position{
 								Column: 27,
-								Line:   92,
+								Line:   207,
 							},
 							File:   "pagerduty.flux",
 							Source: "url=defaultURL",
 							Start: ast.Position{
 								Column: 13,
-								Line:   92,
+								Line:   207,
 							},
 						},
 					},
@@ -5653,13 +6096,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 16,
-									Line:   92,
+									Line:   207,
 								},
 								File:   "pagerduty.flux",
 								Source: "url",
 								Start: ast.Position{
 									Column: 13,
-									Line:   92,
+									Line:   207,
 								},
 							},
 						},
@@ -5673,13 +6116,13 @@ var pkgAST = &ast.Package{
 							Loc: &ast.SourceLocation{
 								End: ast.Position{
 									Column: 27,
-									Line:   92,
+									Line:   207,
 								},
 								File:   "pagerduty.flux",
 								Source: "defaultURL",
 								Start: ast.Position{
 									Column: 17,
-									Line:   92,
+									Line:   207,
 								},
 							},
 						},
@@ -5698,13 +6141,13 @@ var pkgAST = &ast.Package{
 				Loc: &ast.SourceLocation{
 					End: ast.Position{
 						Column: 14,
-						Line:   4,
+						Line:   5,
 					},
 					File:   "pagerduty.flux",
 					Source: "import \"http\"",
 					Start: ast.Position{
 						Column: 1,
-						Line:   4,
+						Line:   5,
 					},
 				},
 			},
@@ -5715,13 +6158,13 @@ var pkgAST = &ast.Package{
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 14,
-							Line:   4,
+							Line:   5,
 						},
 						File:   "pagerduty.flux",
 						Source: "\"http\"",
 						Start: ast.Position{
 							Column: 8,
-							Line:   4,
+							Line:   5,
 						},
 					},
 				},
@@ -5735,13 +6178,13 @@ var pkgAST = &ast.Package{
 				Loc: &ast.SourceLocation{
 					End: ast.Position{
 						Column: 14,
-						Line:   5,
+						Line:   6,
 					},
 					File:   "pagerduty.flux",
 					Source: "import \"json\"",
 					Start: ast.Position{
 						Column: 1,
-						Line:   5,
+						Line:   6,
 					},
 				},
 			},
@@ -5752,13 +6195,13 @@ var pkgAST = &ast.Package{
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 14,
-							Line:   5,
+							Line:   6,
 						},
 						File:   "pagerduty.flux",
 						Source: "\"json\"",
 						Start: ast.Position{
 							Column: 8,
-							Line:   5,
+							Line:   6,
 						},
 					},
 				},
@@ -5772,13 +6215,13 @@ var pkgAST = &ast.Package{
 				Loc: &ast.SourceLocation{
 					End: ast.Position{
 						Column: 17,
-						Line:   6,
+						Line:   7,
 					},
 					File:   "pagerduty.flux",
 					Source: "import \"strings\"",
 					Start: ast.Position{
 						Column: 1,
-						Line:   6,
+						Line:   7,
 					},
 				},
 			},
@@ -5789,13 +6232,13 @@ var pkgAST = &ast.Package{
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 17,
-							Line:   6,
+							Line:   7,
 						},
 						File:   "pagerduty.flux",
 						Source: "\"strings\"",
 						Start: ast.Position{
 							Column: 8,
-							Line:   6,
+							Line:   7,
 						},
 					},
 				},
@@ -5806,18 +6249,18 @@ var pkgAST = &ast.Package{
 		Name:     "pagerduty.flux",
 		Package: &ast.PackageClause{
 			BaseNode: ast.BaseNode{
-				Comments: nil,
+				Comments: []ast.Comment{ast.Comment{Text: "// Package pagerduty provides functions for sending data to PagerDuty.\n"}},
 				Errors:   nil,
 				Loc: &ast.SourceLocation{
 					End: ast.Position{
 						Column: 18,
-						Line:   1,
+						Line:   2,
 					},
 					File:   "pagerduty.flux",
 					Source: "package pagerduty",
 					Start: ast.Position{
 						Column: 1,
-						Line:   1,
+						Line:   2,
 					},
 				},
 			},
@@ -5828,13 +6271,13 @@ var pkgAST = &ast.Package{
 					Loc: &ast.SourceLocation{
 						End: ast.Position{
 							Column: 18,
-							Line:   1,
+							Line:   2,
 						},
 						File:   "pagerduty.flux",
 						Source: "pagerduty",
 						Start: ast.Position{
 							Column: 9,
-							Line:   1,
+							Line:   2,
 						},
 					},
 				},

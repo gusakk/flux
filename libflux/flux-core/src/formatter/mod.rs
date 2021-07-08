@@ -8,18 +8,6 @@ use std::io;
 use std::string::FromUtf8Error;
 
 use chrono::SecondsFormat;
-use wasm_bindgen::prelude::*;
-
-/// Format a JS file.
-#[wasm_bindgen]
-pub fn format_from_js_file(js_file: JsValue) -> String {
-    if let Ok(file) = js_file.into_serde::<File>() {
-        if let Ok(converted) = convert_to_string(&file) {
-            return converted;
-        }
-    }
-    "".to_string()
-}
 
 /// Format a [`File`].
 pub fn convert_to_string(file: &File) -> Result<String, Error> {
@@ -802,6 +790,10 @@ impl Formatter {
         }
     }
 
+    // XXX: rockstar (17 Jun 2021) - This clippy lint erroneously flags this
+    // function with lint. It's allowed here, for now.
+    // See https://github.com/rust-lang/rust-clippy/issues/7369
+    #[allow(clippy::branches_sharing_code)]
     fn format_node_with_parens(&mut self, node: &Node) {
         if has_parens(node) {
             // If the AST already has parens here do not double add them

@@ -4,7 +4,7 @@
 # and verification, we can list the rust container as a prior build stage, and
 # then pull in the artifacts we need. There is an added benefit that tagged versions
 # also include minory releases, so 1.2 includes 1.2.1 and so on, for bugfix releases.
-FROM rust:1.52 as RUSTBUILD
+FROM rust:1.53 as RUSTBUILD
 
 FROM golang:1.16
 
@@ -13,7 +13,7 @@ RUN apt-get update && \
     apt-get install --no-install-recommends -y \
     openssl libtinfo5 ruby \
     ca-certificates curl file gnupg \
-    build-essential cmake \
+    build-essential cmake nodejs npm \
     libxml2-dev libssl-dev zlib1g-dev \
     autoconf automake autotools-dev libtool xutils-dev valgrind && \
     rm -rf /var/lib/apt/lists/*
@@ -37,7 +37,8 @@ ENV RUSTC_WRAPPER=sccache
 # Install additional tooling and requirements for building flux.
 ENV COLM_VERSION=0.14.2
 ENV RAGEL7_VERSION=7.0.1
-RUN curl https://www.colm.net/files/thurston.asc | gpg --import - && \
+COPY .thurston.asc thurston.asc
+RUN gpg --import thurston.asc && \
     curl https://www.colm.net/files/colm/colm-${COLM_VERSION}.tar.gz -O && \
     curl https://www.colm.net/files/colm/colm-${COLM_VERSION}.tar.gz.asc -O && \
     gpg --verify colm-${COLM_VERSION}.tar.gz.asc colm-${COLM_VERSION}.tar.gz && \
@@ -56,13 +57,16 @@ RUN curl https://www.colm.net/files/thurston.asc | gpg --import - && \
     make && \
     make install && \
     cd .. && rm -rf ragel-${RAGEL7_VERSION}*
-ENV FLATBUFFERS_VERSION=1.11.0
-RUN curl -LS https://github.com/google/flatbuffers/archive/v${FLATBUFFERS_VERSION}.tar.gz | gunzip -c | tar x && \
+ENV FLATBUFFERS_VERSION=2.0.0 \
+    FLATBUFFERS_CHECKSUM=9ddb9031798f4f8754d00fca2f1a68ecf9d0f83dfac7239af1311e4fd9a565c4
+RUN curl -LS https://github.com/google/flatbuffers/archive/v${FLATBUFFERS_VERSION}.tar.gz -O && \
+    echo "${FLATBUFFERS_CHECKSUM} v${FLATBUFFERS_VERSION}.tar.gz" | sha256sum --check -- && \
+    tar xvzf v${FLATBUFFERS_VERSION}.tar.gz && \
     mkdir flatbuffers-${FLATBUFFERS_VERSION}/build && \
     cd flatbuffers-${FLATBUFFERS_VERSION}/build && \
     cmake -G "Unix Makefiles" .. && \
     make && make install && \
-    cd ../.. && rm -rf flatbuffers-${FLATBUFFERS_VERSION}
+    cd ../.. && rm -rf flatbuffers-${FLATBUFFERS_VERSION} v${FLATBUFFERS_VERSION}.tar.gz
 
 # Add builder user
 ENV UNAME=builder
