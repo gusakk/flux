@@ -38,7 +38,7 @@ func TestPredictLinear_NewQuery(t *testing.T) {
 						Spec: &universe.PredictLinearOpSpec{
 							ValueDst:    execute.DefaultTimeColLabel,
 							WantedValue: 10.0,
-							Columns: []string{"a", "b"},
+							Columns:     []string{"a", "b"},
 						},
 					},
 				},
@@ -69,7 +69,7 @@ func TestPredictLinear_Process(t *testing.T) {
 			spec: &universe.PredictLinearProcedureSpec{
 				WantedValue: 50,
 				ValueLabel:  execute.DefaultTimeColLabel,
-				Columns: []string{"x", "_time"},
+				Columns:     []string{"x", "_time"},
 			},
 			data: []flux.Table{&executetest.Table{
 				KeyCols: []string{"_start", "_stop"},
@@ -105,7 +105,7 @@ func TestPredictLinear_Process(t *testing.T) {
 			spec: &universe.PredictLinearProcedureSpec{
 				WantedValue: 0,
 				ValueLabel:  execute.DefaultTimeColLabel,
-				Columns: []string{"x", "_time"},
+				Columns:     []string{"x", "_time"},
 			},
 			data: []flux.Table{&executetest.Table{
 				KeyCols: []string{"_start", "_stop"},
@@ -141,7 +141,7 @@ func TestPredictLinear_Process(t *testing.T) {
 			spec: &universe.PredictLinearProcedureSpec{
 				WantedValue: 0,
 				ValueLabel:  execute.DefaultTimeColLabel,
-					Columns: []string{"x", "_time"},
+				Columns:     []string{"x", "_time"},
 			},
 			data: []flux.Table{&executetest.Table{
 				KeyCols: []string{"_start", "_stop"},

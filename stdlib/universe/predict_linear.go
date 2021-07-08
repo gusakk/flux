@@ -25,7 +25,7 @@ func init() {
 	predictLinearSignature := execute.AggregateSignature(map[string]semantic.PolyType{
 		"valueDst":    semantic.String,
 		"wantedValue": semantic.Float,
-		"columns":  semantic.NewArrayPolyType(semantic.String),
+		"columns":     semantic.NewArrayPolyType(semantic.String),
 	}, []string{"columns"})
 
 	flux.RegisterPackageValue("universe", PredictLinearKind, flux.FunctionValue(PredictLinearKind, createPredictLinearOpSpec, predictLinearSignature))
@@ -87,7 +87,7 @@ func (s *PredictLinearOpSpec) Kind() flux.OperationKind {
 type PredictLinearProcedureSpec struct {
 	ValueLabel  string
 	WantedValue float64
-	Columns            []string
+	Columns     []string
 }
 
 func newPredictLinearProcedure(qs flux.OperationSpec, pa plan.Administration) (plan.ProcedureSpec, error) {
@@ -165,7 +165,7 @@ func (t *PredictLinearTransformation) Process(id execute.DatasetID, tbl flux.Tab
 	}
 
 	if err := execute.AddTableKeyCols(tbl.Key(), builder); err != nil {
-		return errors.Wrap(err, codes.Internal,"failed to add table cols")
+		return errors.Wrap(err, codes.Internal, "failed to add table cols")
 	}
 
 	valueIdx, err := builder.AddCol(flux.ColMeta{
@@ -215,7 +215,7 @@ func (t *PredictLinearTransformation) Process(id execute.DatasetID, tbl flux.Tab
 	}
 
 	if err := execute.AppendKeyValues(tbl.Key(), builder); err != nil {
-		return errors.Wrap(err, codes.Internal,"failed to append key values")
+		return errors.Wrap(err, codes.Internal, "failed to append key values")
 	}
 
 	if err := builder.AppendTime(valueIdx, value); err != nil {
