@@ -102,7 +102,7 @@ jobs:
 
   release:
     docker:
-      - image: circleci/golang:1.12
+      - image: quay.io/influxdb/flux-build:latest
     environment:
       GOCACHE: /tmp/go-cache
       GOFLAGS: -p=8
