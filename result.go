@@ -235,6 +235,12 @@ type MultiResultDecoder interface {
 	Decode(r io.ReadCloser) (ResultIterator, error)
 }
 
+// ChannelMultiResultDecoder can decode multiple results from the channel.
+type ChannelMultiResultDecoder interface {
+	// Decode decodes multiple results from rc.
+	Decode(rc chan io.ReadCloser) (ResultIterator, error)
+}
+
 // MultiResultEncoder can encode multiple results into a writer.
 type MultiResultEncoder interface {
 	// Encode writes multiple results from r into w.

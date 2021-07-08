@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"io/ioutil"
 	"regexp"
 	"strings"
@@ -753,7 +754,7 @@ func TestResultDecoder(t *testing.T) {
 			if tc.skip {
 				t.Skip()
 			}
-			decoder := csv.NewResultDecoder(tc.decoderConfig)
+			decoder := csv.NewResultDecoder(context.Background(), tc.decoderConfig)
 			result, err := decoder.Decode(bytes.NewReader(tc.encoded))
 			if err != nil {
 				if tc.result.Err != nil {
@@ -1535,7 +1536,7 @@ func TestMultiResultDecoder(t *testing.T) {
 func TestTable(t *testing.T) {
 	executetest.RunTableTests(t, executetest.TableTest{
 		NewFn: func(ctx context.Context, alloc *memory.Allocator) flux.TableIterator {
-			decoder := csv.NewResultDecoder(csv.ResultDecoderConfig{
+			decoder := csv.NewResultDecoder(context.Background(), csv.ResultDecoderConfig{
 				// Set this to a low value so we can have a table with
 				// multiple buffers.
 				MaxBufferCount: 5,
@@ -1577,6 +1578,458 @@ func TestTable(t *testing.T) {
 			return tbl.(interface{ IsDone() bool }).IsDone()
 		},
 	})
+}
+
+func TestChannelMultiResultDecoder(t *testing.T) {
+	defaultReadersCount := 2
+	testCases := []struct {
+		name         string
+		config       csv.ResultDecoderConfig
+		encoded      []byte
+		readersCount int
+		results      []*executetest.Result
+		err          error
+	}{
+		{
+			name: "single result",
+			encoded: toCRLF(`#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
+#group,false,false,true,true,false,true,true,false
+#default,_result,0,2018-04-17T00:00:00Z,2018-04-17T00:05:00Z,,cpu,A,
+,result,table,_start,_stop,_time,_measurement,host,_value
+,,,,,2018-04-17T00:00:00Z,cpu,A,42.0
+,,,,,2018-04-17T00:00:01Z,cpu,A,43.0
+`),
+			readersCount: defaultReadersCount,
+			results: []*executetest.Result{{
+				Nm: "_result",
+				Tbls: []*executetest.Table{{
+					KeyCols: []string{"_start", "_stop", "_measurement", "host"},
+					ColMeta: []flux.ColMeta{
+						{Label: "_start", Type: flux.TTime},
+						{Label: "_stop", Type: flux.TTime},
+						{Label: "_time", Type: flux.TTime},
+						{Label: "_measurement", Type: flux.TString},
+						{Label: "host", Type: flux.TString},
+						{Label: "_value", Type: flux.TFloat},
+					},
+					Data: [][]interface{}{
+						{
+							values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+							values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+							values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+							"cpu",
+							"A",
+							42.0,
+						},
+						{
+							values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+							values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+							values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 1, 0, time.UTC)),
+							"cpu",
+							"A",
+							43.0,
+						},
+					},
+				}},
+			}, {
+				Nm: "_result",
+				Tbls: []*executetest.Table{{
+					KeyCols: []string{"_start", "_stop", "_measurement", "host"},
+					ColMeta: []flux.ColMeta{
+						{Label: "_start", Type: flux.TTime},
+						{Label: "_stop", Type: flux.TTime},
+						{Label: "_time", Type: flux.TTime},
+						{Label: "_measurement", Type: flux.TString},
+						{Label: "host", Type: flux.TString},
+						{Label: "_value", Type: flux.TFloat},
+					},
+					Data: [][]interface{}{
+						{
+							values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+							values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+							values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+							"cpu",
+							"A",
+							42.0,
+						},
+						{
+							values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+							values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+							values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 1, 0, time.UTC)),
+							"cpu",
+							"A",
+							43.0,
+						},
+					},
+				}},
+			}},
+		},
+		{
+			name: "empty result",
+			encoded: toCRLF(`#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
+#group,false,false,true,true,false,true,true,false
+#default,_result,0,2018-04-17T00:00:00Z,2018-04-17T00:05:00Z,,cpu,A,
+,result,table,_start,_stop,_time,_measurement,host,_value
+`),
+			readersCount: defaultReadersCount,
+			results: []*executetest.Result{{
+				Nm: "_result",
+				Tbls: []*executetest.Table{{
+					KeyCols: []string{"_start", "_stop", "_measurement", "host"},
+					KeyValues: []interface{}{
+						values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+						values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+						"cpu",
+						"A",
+					},
+					ColMeta: []flux.ColMeta{
+						{Label: "_start", Type: flux.TTime},
+						{Label: "_stop", Type: flux.TTime},
+						{Label: "_time", Type: flux.TTime},
+						{Label: "_measurement", Type: flux.TString},
+						{Label: "host", Type: flux.TString},
+						{Label: "_value", Type: flux.TFloat},
+					},
+					Data: [][]interface{}(nil),
+				}},
+			}, {
+				Nm: "_result",
+				Tbls: []*executetest.Table{{
+					KeyCols: []string{"_start", "_stop", "_measurement", "host"},
+					KeyValues: []interface{}{
+						values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+						values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+						"cpu",
+						"A",
+					},
+					ColMeta: []flux.ColMeta{
+						{Label: "_start", Type: flux.TTime},
+						{Label: "_stop", Type: flux.TTime},
+						{Label: "_time", Type: flux.TTime},
+						{Label: "_measurement", Type: flux.TString},
+						{Label: "host", Type: flux.TString},
+						{Label: "_value", Type: flux.TFloat},
+					},
+					Data: [][]interface{}(nil),
+				}},
+			}},
+		},
+		{
+			name: "two results",
+			encoded: toCRLF(`#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
+#group,false,false,true,true,false,true,true,false
+#default,_result,,,,,,,
+,result,table,_start,_stop,_time,_measurement,host,_value
+,,0,2018-04-17T00:00:00Z,2018-04-17T00:05:00Z,2018-04-17T00:00:00Z,cpu,A,42
+,,0,2018-04-17T00:00:00Z,2018-04-17T00:05:00Z,2018-04-17T00:00:01Z,cpu,A,43
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
+#group,false,false,true,true,false,true,true,false
+#default,mean,,,,,,,
+,result,table,_start,_stop,_time,_measurement,host,_value
+,,0,2018-04-17T00:00:00Z,2018-04-17T00:05:00Z,2018-04-17T00:00:00Z,cpu,A,40
+,,0,2018-04-17T00:00:00Z,2018-04-17T00:05:00Z,2018-04-17T00:00:01Z,cpu,A,40.1
+`),
+			readersCount: defaultReadersCount,
+			results: []*executetest.Result{
+				{
+					Nm: "_result",
+					Tbls: []*executetest.Table{{
+						KeyCols: []string{"_start", "_stop", "_measurement", "host"},
+						ColMeta: []flux.ColMeta{
+							{Label: "_start", Type: flux.TTime},
+							{Label: "_stop", Type: flux.TTime},
+							{Label: "_time", Type: flux.TTime},
+							{Label: "_measurement", Type: flux.TString},
+							{Label: "host", Type: flux.TString},
+							{Label: "_value", Type: flux.TFloat},
+						},
+						Data: [][]interface{}{
+							{
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+								"cpu",
+								"A",
+								42.0,
+							},
+							{
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 1, 0, time.UTC)),
+								"cpu",
+								"A",
+								43.0,
+							},
+						},
+					}},
+				},
+				{
+					Nm: "mean",
+					Tbls: []*executetest.Table{{
+						KeyCols: []string{"_start", "_stop", "_measurement", "host"},
+						ColMeta: []flux.ColMeta{
+							{Label: "_start", Type: flux.TTime},
+							{Label: "_stop", Type: flux.TTime},
+							{Label: "_time", Type: flux.TTime},
+							{Label: "_measurement", Type: flux.TString},
+							{Label: "host", Type: flux.TString},
+							{Label: "_value", Type: flux.TFloat},
+						},
+						Data: [][]interface{}{
+							{
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+								"cpu",
+								"A",
+								40.0,
+							},
+							{
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 1, 0, time.UTC)),
+								"cpu",
+								"A",
+								40.1,
+							},
+						},
+					}},
+				},
+				{
+					Nm: "_result",
+					Tbls: []*executetest.Table{{
+						KeyCols: []string{"_start", "_stop", "_measurement", "host"},
+						ColMeta: []flux.ColMeta{
+							{Label: "_start", Type: flux.TTime},
+							{Label: "_stop", Type: flux.TTime},
+							{Label: "_time", Type: flux.TTime},
+							{Label: "_measurement", Type: flux.TString},
+							{Label: "host", Type: flux.TString},
+							{Label: "_value", Type: flux.TFloat},
+						},
+						Data: [][]interface{}{
+							{
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+								"cpu",
+								"A",
+								42.0,
+							},
+							{
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 1, 0, time.UTC)),
+								"cpu",
+								"A",
+								43.0,
+							},
+						},
+					}},
+				},
+				{
+					Nm: "mean",
+					Tbls: []*executetest.Table{{
+						KeyCols: []string{"_start", "_stop", "_measurement", "host"},
+						ColMeta: []flux.ColMeta{
+							{Label: "_start", Type: flux.TTime},
+							{Label: "_stop", Type: flux.TTime},
+							{Label: "_time", Type: flux.TTime},
+							{Label: "_measurement", Type: flux.TString},
+							{Label: "host", Type: flux.TString},
+							{Label: "_value", Type: flux.TFloat},
+						},
+						Data: [][]interface{}{
+							{
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+								"cpu",
+								"A",
+								40.0,
+							},
+							{
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+								values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 1, 0, time.UTC)),
+								"cpu",
+								"A",
+								40.1,
+							},
+						},
+					}},
+				},
+			},
+		},
+		{
+			name: "two empty results",
+			encoded: toCRLF(`#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
+#group,false,false,true,true,false,true,true,false
+#default,_result1,0,2018-04-17T00:00:00Z,2018-04-17T00:05:00Z,,cpu,A,
+,result,table,_start,_stop,_time,_measurement,host,_value
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
+#group,false,false,true,true,false,true,true,false
+#default,_result2,0,2018-04-17T00:00:00Z,2018-04-17T00:05:00Z,,cpu-0,B,
+,result,table,_start,_stop,_time,_measurement,host,_value
+`),
+			readersCount: defaultReadersCount,
+			results: []*executetest.Result{{
+				Nm: "_result1",
+				Tbls: []*executetest.Table{{
+					KeyCols: []string{"_start", "_stop", "_measurement", "host"},
+					KeyValues: []interface{}{
+						values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+						values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+						"cpu",
+						"A",
+					},
+					ColMeta: []flux.ColMeta{
+						{Label: "_start", Type: flux.TTime},
+						{Label: "_stop", Type: flux.TTime},
+						{Label: "_time", Type: flux.TTime},
+						{Label: "_measurement", Type: flux.TString},
+						{Label: "host", Type: flux.TString},
+						{Label: "_value", Type: flux.TFloat},
+					},
+					Data: [][]interface{}(nil),
+				}},
+			}, {
+				Nm: "_result2",
+				Tbls: []*executetest.Table{{
+					KeyCols: []string{"_start", "_stop", "_measurement", "host"},
+					KeyValues: []interface{}{
+						values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+						values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+						"cpu-0",
+						"B",
+					},
+					ColMeta: []flux.ColMeta{
+						{Label: "_start", Type: flux.TTime},
+						{Label: "_stop", Type: flux.TTime},
+						{Label: "_time", Type: flux.TTime},
+						{Label: "_measurement", Type: flux.TString},
+						{Label: "host", Type: flux.TString},
+						{Label: "_value", Type: flux.TFloat},
+					},
+					Data: [][]interface{}(nil),
+				}},
+			}, {
+				Nm: "_result1",
+				Tbls: []*executetest.Table{{
+					KeyCols: []string{"_start", "_stop", "_measurement", "host"},
+					KeyValues: []interface{}{
+						values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+						values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+						"cpu",
+						"A",
+					},
+					ColMeta: []flux.ColMeta{
+						{Label: "_start", Type: flux.TTime},
+						{Label: "_stop", Type: flux.TTime},
+						{Label: "_time", Type: flux.TTime},
+						{Label: "_measurement", Type: flux.TString},
+						{Label: "host", Type: flux.TString},
+						{Label: "_value", Type: flux.TFloat},
+					},
+					Data: [][]interface{}(nil),
+				}},
+			}, {
+				Nm: "_result2",
+				Tbls: []*executetest.Table{{
+					KeyCols: []string{"_start", "_stop", "_measurement", "host"},
+					KeyValues: []interface{}{
+						values.ConvertTime(time.Date(2018, 4, 17, 0, 0, 0, 0, time.UTC)),
+						values.ConvertTime(time.Date(2018, 4, 17, 0, 5, 0, 0, time.UTC)),
+						"cpu-0",
+						"B",
+					},
+					ColMeta: []flux.ColMeta{
+						{Label: "_start", Type: flux.TTime},
+						{Label: "_stop", Type: flux.TTime},
+						{Label: "_time", Type: flux.TTime},
+						{Label: "_measurement", Type: flux.TString},
+						{Label: "host", Type: flux.TString},
+						{Label: "_value", Type: flux.TFloat},
+					},
+					Data: [][]interface{}(nil),
+				}},
+			}},
+		},
+		{
+			name: "decodes errors",
+			encoded: toCRLF(`#datatype,string,string
+#group,true,true
+#default,,
+,error,reference
+,test error,
+`),
+			readersCount: defaultReadersCount,
+			err:          errors.New("test error"),
+		},
+		{
+			name:         "no readers",
+			readersCount: 0,
+			err:          errors.New("no sources available"),
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			decoder := csv.NewChannelMultiResultDecoder(context.Background(), tc.config)
+			rc := make(chan io.ReadCloser)
+			go func() {
+				for i := 0; i < tc.readersCount; i++ {
+					rc <- ioutil.NopCloser(bytes.NewReader(tc.encoded))
+				}
+				close(rc)
+			}()
+
+			results, err := decoder.Decode(rc)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var got []*executetest.Result
+			for results.More() {
+				result := results.Next()
+				res := &executetest.Result{
+					Nm: result.Name(),
+				}
+				if err := result.Tables().Do(func(tbl flux.Table) error {
+					cb, err := executetest.ConvertTable(tbl)
+					if err != nil {
+						return err
+					}
+					res.Tbls = append(res.Tbls, cb)
+					return nil
+				}); err != nil {
+					t.Fatal(err)
+				}
+				res.Normalize()
+				got = append(got, res)
+			}
+
+			if err := results.Err(); err != nil {
+				if tc.err == nil {
+					t.Errorf("unexpected error: %s", tc.err)
+				} else if got, want := err.Error(), tc.err.Error(); got != want {
+					t.Error("unexpected error -want/+got", cmp.Diff(want, got))
+				}
+			} else if tc.err != nil {
+				t.Error("expected error")
+			}
+
+			// Normalize all of the tables for the test case.
+			for _, result := range tc.results {
+				result.Normalize()
+			}
+
+			if !cmp.Equal(got, tc.results) {
+				t.Error("unexpected results -want/+got", cmp.Diff(tc.results, got))
+			}
+		})
+	}
 }
 
 var crlfPattern = regexp.MustCompile(`\r?\n`)

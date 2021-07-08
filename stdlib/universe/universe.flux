@@ -69,6 +69,7 @@ builtin union
 builtin unique
 builtin window
 builtin yield
+builtin predictLinear
 
 // stream/table index functions
 builtin tableFind

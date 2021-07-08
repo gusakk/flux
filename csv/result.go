@@ -2,6 +2,7 @@
 package csv
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -55,16 +56,18 @@ const (
 
 // ResultDecoder decodes a csv representation of a result.
 type ResultDecoder struct {
-	c ResultDecoderConfig
+	c   ResultDecoderConfig
+	ctx context.Context
 }
 
 // NewResultDecoder creates a new ResultDecoder.
-func NewResultDecoder(c ResultDecoderConfig) *ResultDecoder {
+func NewResultDecoder(ctx context.Context, c ResultDecoderConfig) *ResultDecoder {
 	if c.MaxBufferCount == 0 {
 		c.MaxBufferCount = defaultMaxBufferCount
 	}
 	return &ResultDecoder{
-		c: c,
+		c:   c,
+		ctx: ctx,
 	}
 }
 
@@ -81,7 +84,122 @@ type ResultDecoderConfig struct {
 }
 
 func (d *ResultDecoder) Decode(r io.Reader) (flux.Result, error) {
-	return newResultDecoder(newCSVReader(r), d.c, nil)
+	return newResultDecoder(d.ctx, newCSVReader(r), d.c, nil)
+}
+
+// ChannelMultiResultDecoder reads multiple results from the channel.
+// Results are delimited by an empty line.
+type ChannelMultiResultDecoder struct {
+	c   ResultDecoderConfig
+	ctx context.Context
+}
+
+// NewChannelMultiResultDecoder creates a NewChannelMultiResultDecoder.
+func NewChannelMultiResultDecoder(ctx context.Context, c ResultDecoderConfig) *ChannelMultiResultDecoder {
+	if c.MaxBufferCount == 0 {
+		c.MaxBufferCount = defaultMaxBufferCount
+	}
+	return &ChannelMultiResultDecoder{
+		c:   c,
+		ctx: ctx,
+	}
+}
+
+func (d *ChannelMultiResultDecoder) Decode(rc chan io.ReadCloser) (flux.ResultIterator, error) {
+	return NewChannelResultIterator(d.ctx, d.c, rc)
+}
+
+func NewChannelResultIterator(ctx context.Context, c ResultDecoderConfig, rc chan io.ReadCloser) (*channelResultIterator, error) {
+	return &channelResultIterator{
+		c:   c,
+		rc:  rc,
+		ctx: ctx,
+	}, nil
+}
+
+// channelResultIterator iterates through the results encoded in rs.
+type channelResultIterator struct {
+	c    ResultDecoderConfig
+	rc   chan io.ReadCloser
+	next *resultDecoder
+	cr   *csv.Reader
+	err  error
+
+	readers  []io.ReadCloser
+	canceled bool
+
+	ctx context.Context
+}
+
+// More detects if it is possible to read more results or not.
+// Results will be read from the different reader instances sequentially.
+// When the reader reaches EOF, the data will be read from the next reader instance, and so on...
+// until the appropriate channel with readers will be closed.
+func (r *channelResultIterator) More() bool {
+	// select new reader instance from the channel if csv reader
+	// has not been initialized yet or reached EOF.
+	// returns false if the appropriate channel has been already closed.
+	if r.next == nil || r.next.eof {
+		reader, ok := <-r.rc
+		if ok {
+			r.readers = append(r.readers, reader)
+			r.cr = newCSVReader(reader)
+			// set r.next to nil to indicate that the tables will be read from the new reader instance.
+			r.next = nil
+		} else {
+			if len(r.readers) == 0 {
+				// channel with readers is closed, but iterator didn't get any reader
+				r.err = errors.New(codes.Internal, "no sources available")
+			}
+			return false
+		}
+	}
+
+	// read the tables from the same reader instance until eof.
+	var extraMeta *tableMetadata
+	if r.next != nil {
+		extraMeta = r.next.extraMeta
+	}
+	r.next, r.err = newResultDecoder(r.ctx, r.cr, r.c, extraMeta)
+	if r.err == nil {
+		return true
+	}
+	if r.err == io.EOF {
+		// Do not report EOF errors
+		// If the response from the current reader is empty (EOF)
+		// then try to read the response from the next reader (via requesting reader instance
+		// from the appropriate reader channel)
+		// To execute that - just call More() func again.
+		r.err = nil
+		return r.More()
+	}
+
+	return false
+}
+func (r *channelResultIterator) Next() flux.Result {
+	return r.next
+}
+
+func (r *channelResultIterator) Statistics() flux.Statistics {
+	return flux.Statistics{}
+}
+
+func (r *channelResultIterator) Release() {
+	if r.canceled {
+		return
+	}
+
+	// Close all readers
+	for _, reader := range r.readers {
+		if err := reader.Close(); err != nil && r.err == nil {
+			r.err = err
+		}
+		r.canceled = true
+	}
+}
+
+func (r *channelResultIterator) Err() error {
+	return r.err
 }
 
 // MultiResultDecoder reads multiple results from a single csv file.
@@ -117,6 +235,7 @@ type resultIterator struct {
 	err  error
 
 	canceled bool
+	ctx      context.Context
 }
 
 func (r *resultIterator) More() bool {
@@ -125,7 +244,7 @@ func (r *resultIterator) More() bool {
 		if r.next != nil {
 			extraMeta = r.next.extraMeta
 		}
-		r.next, r.err = newResultDecoder(r.cr, r.c, extraMeta)
+		r.next, r.err = newResultDecoder(r.ctx, r.cr, r.c, extraMeta)
 		if r.err == nil {
 			return true
 		}
@@ -172,13 +291,15 @@ type resultDecoder struct {
 	extraMeta *tableMetadata
 
 	eof bool
+	ctx context.Context
 }
 
-func newResultDecoder(cr *csv.Reader, c ResultDecoderConfig, extraMeta *tableMetadata) (*resultDecoder, error) {
+func newResultDecoder(ctx context.Context, cr *csv.Reader, c ResultDecoderConfig, extraMeta *tableMetadata) (*resultDecoder, error) {
 	d := &resultDecoder{
 		c:         c,
 		cr:        cr,
 		extraMeta: extraMeta,
+		ctx:       ctx,
 	}
 	// We need to know the result ID before we return
 	if extraMeta == nil {

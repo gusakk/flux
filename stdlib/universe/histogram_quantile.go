@@ -264,7 +264,8 @@ func (t *histogramQuantileTransformation) computeQuantile(cdf []bucket) (float64
 	rankIdx := -1
 	for i, b := range cdf {
 		if b.count < prevCount {
-			return 0, errors.New(codes.FailedPrecondition, "histogram records counts are not monotonic")
+			// histogram records counts are not monotonic, fixing it artifically
+			b.count = prevCount
 		}
 		prevCount = b.count
 
