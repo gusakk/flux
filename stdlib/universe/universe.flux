@@ -70,6 +70,7 @@ builtin unique
 builtin window
 builtin yield
 builtin predictLinear
+builtin fillMissing
 
 // stream/table index functions
 builtin tableFind

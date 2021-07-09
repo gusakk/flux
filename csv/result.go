@@ -206,15 +206,17 @@ func (r *channelResultIterator) Err() error {
 // Results are delimited by an empty line.
 type MultiResultDecoder struct {
 	c ResultDecoderConfig
+	ctx context.Context
 }
 
 // NewMultiResultDecoder creates a new MultiResultDecoder.
-func NewMultiResultDecoder(c ResultDecoderConfig) *MultiResultDecoder {
+func NewMultiResultDecoder(ctx context.Context, c ResultDecoderConfig) *MultiResultDecoder {
 	if c.MaxBufferCount == 0 {
 		c.MaxBufferCount = defaultMaxBufferCount
 	}
 	return &MultiResultDecoder{
 		c: c,
+		ctx: ctx,
 	}
 }
 
@@ -223,6 +225,7 @@ func (d *MultiResultDecoder) Decode(r io.ReadCloser) (flux.ResultIterator, error
 		c:  d.c,
 		r:  r,
 		cr: newCSVReader(r),
+		ctx: d.ctx,
 	}, nil
 }
 
@@ -377,7 +380,16 @@ func (r *resultDecoder) Do(f func(flux.Table) error) error {
 		if err := f(b); err != nil {
 			return err
 		}
-		<-b.done
+		select {
+		case <-b.done:
+			// `b.done` may be closed in `resultDecoder.newTable`
+			// if number of rows is <= resultDecoder.c.MaxBufferCount
+			// or it should be closed in tableDecoder.Do called by `f(b)`
+		case <-r.ctx.Done():
+			// f(b) can fail to call tableDecoder.Do that closes the `b.done` channel if context is cancelled;
+			// return as soon as context is done to unblock the execution
+			return errors.Wrap(r.ctx.Err(), codes.Internal, "context done in resultDecoder.Do()")
+		}
 		// track whether we hit the EOF
 		r.eof = b.eof
 		// track any extra line that was read

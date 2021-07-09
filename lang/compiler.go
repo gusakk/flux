@@ -247,7 +247,7 @@ func (p *Program) Start(ctx context.Context, alloc *memory.Allocator) (flux.Quer
 		},
 	}
 
-	e := execute.NewExecutor(p.Logger)
+	e := execute.NewExecutor(p.Logger, nil)
 	resultMap, md, err := e.Execute(cctx, p.PlanSpec, q.alloc)
 	if err != nil {
 		s.Finish()

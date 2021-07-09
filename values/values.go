@@ -4,6 +4,7 @@ package values
 import (
 	"bytes"
 	"fmt"
+	intern "github.com/gusakk/flux/util"
 	"regexp"
 	"runtime/debug"
 	"strconv"
@@ -237,7 +238,7 @@ func NewFromString(t semantic.Type, s string) (Value, error) {
 func NewString(v string) Value {
 	return value{
 		t: semantic.String,
-		v: v,
+		v: intern.String(v),
 	}
 }
 func NewBytes(v []byte) Value {

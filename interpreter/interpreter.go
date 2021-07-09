@@ -19,6 +19,7 @@ type Interpreter struct {
 	sideEffects     []SideEffect // a list of the side effects occurred during the last call to `Eval`.
 	pkg             *Package
 	modifiedOptions []optionMutation
+	skipYieldCheck bool
 }
 
 func NewInterpreter(pkg *Package) *Interpreter {
@@ -33,6 +34,14 @@ func NewInterpreter(pkg *Package) *Interpreter {
 type SideEffect struct {
 	Node  semantic.Node
 	Value values.Value
+}
+
+// NewBackwardCompatibleInterpreter should be used for old flux queries (v0.12.0)
+// to avoid using manual yield() in the queries definition.
+func NewBackwardCompatibleInterpreter(pkg *Package) *Interpreter {
+	itrp := NewInterpreter(pkg)
+	itrp.skipYieldCheck = true
+	return itrp
 }
 
 // Eval evaluates the expressions composing a Flux package and returns any side effects that occurred during this evaluation.
@@ -102,7 +111,7 @@ func (itrp *Interpreter) doFile(ctx context.Context, file *semantic.File, scope 
 		if err != nil {
 			return err
 		}
-		if es, ok := stmt.(*semantic.ExpressionStatement); ok {
+		if es, ok := stmt.(*semantic.ExpressionStatement); ok || itrp.skipYieldCheck {
 			// Only in the main package are all unassigned package
 			// level expressions coerced into producing side effects.
 			if itrp.pkg.Name() == semantic.PackageMain {

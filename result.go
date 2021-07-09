@@ -194,6 +194,7 @@ type GroupKey interface {
 	ValueDuration(j int) values.Duration
 	ValueTime(j int) values.Time
 	Value(j int) values.Value
+	Sorted(j int) int
 
 	Equal(o GroupKey) bool
 	Less(o GroupKey) bool

@@ -9,16 +9,16 @@ inData = "
 #group,false,false,true,true,false,false
 #default,_result,,,,,
 ,result,table,_time,_field,_value,le
-,,1,2018-05-22T19:53:00Z,2018-05-22T19:54:00Z,2018-05-22T19:53:00Z,x_duration_seconds,0,0.0
-,,1,2018-05-22T19:53:00Z,2018-05-22T19:54:00Z,2018-05-22T19:53:00Z,x_duration_seconds,0,1.0
-,,1,2018-05-22T19:53:00Z,2018-05-22T19:54:00Z,2018-05-22T19:53:00Z,x_duration_seconds,0,4.0
-,,1,2018-05-22T19:53:00Z,2018-05-22T19:54:00Z,2018-05-22T19:53:00Z,x_duration_seconds,0,23.0
-,,1,2018-05-22T19:53:00Z,2018-05-22T19:54:00Z,2018-05-22T19:53:00Z,x_duration_seconds,0,111.0
-,,1,2018-05-22T19:53:00Z,2018-05-22T19:54:00Z,2018-05-22T19:53:00Z,x_duration_seconds,0,537.0
-,,1,2018-05-22T19:53:00Z,2018-05-22T19:54:00Z,2018-05-22T19:53:00Z,x_duration_seconds,0,2588.0
-,,1,2018-05-22T19:53:00Z,2018-05-22T19:54:00Z,2018-05-22T19:53:00Z,x_duration_seconds,0,12461.0
-,,1,2018-05-22T19:53:00Z,2018-05-22T19:54:00Z,2018-05-22T19:53:00Z,x_duration_seconds,0,59999.0
-,,1,2018-05-22T19:53:00Z,2018-05-22T19:54:00Z,2018-05-22T19:53:00Z,x_duration_seconds,0,+Inf
+,,0,2018-05-22T19:53:00Z,x_duration_seconds,0,0.0
+,,0,2018-05-22T19:53:00Z,x_duration_seconds,0,1.0
+,,0,2018-05-22T19:53:00Z,x_duration_seconds,0,4.0
+,,0,2018-05-22T19:53:00Z,x_duration_seconds,0,23.0
+,,0,2018-05-22T19:53:00Z,x_duration_seconds,0,111.0
+,,0,2018-05-22T19:53:00Z,x_duration_seconds,0,537.0
+,,0,2018-05-22T19:53:00Z,x_duration_seconds,0,2588.0
+,,0,2018-05-22T19:53:00Z,x_duration_seconds,0,12461.0
+,,0,2018-05-22T19:53:00Z,x_duration_seconds,0,59999.0
+,,0,2018-05-22T19:53:00Z,x_duration_seconds,0,+Inf
 "
 outData = "
 #datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,double

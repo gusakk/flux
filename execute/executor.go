@@ -4,6 +4,7 @@ package execute
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -29,14 +30,16 @@ type Executor interface {
 
 type executor struct {
 	logger *zap.Logger
+	panicMetric *prometheus.CounterVec
 }
 
-func NewExecutor(logger *zap.Logger) Executor {
+func NewExecutor(logger *zap.Logger, panicMetric *prometheus.CounterVec) Executor {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 	e := &executor{
 		logger: logger,
+		panicMetric: panicMetric,
 	}
 	return e
 }
@@ -93,7 +96,7 @@ func (e *executor) createExecutionState(ctx context.Context, p *plan.Spec, a *me
 		resources: p.Resources,
 		results:   make(map[string]flux.Result),
 		// TODO(nathanielc): Have the planner specify the dispatcher throughput
-		dispatcher: newPoolDispatcher(10, e.logger),
+		dispatcher: newPoolDispatcher(10, e.logger, e.panicMetric),
 	}
 	v := &createExecutionNodeVisitor{
 		ctx:   ctx,

@@ -5,6 +5,7 @@ import "experimental"
 // Post submits an HTTP post request to the specified URL with headers and data.
 // The HTTP status code is returned.
 builtin post
+builtin to
 
 // basicAuth will take a username/password combination and return the authorization
 // header value.

@@ -55,6 +55,11 @@ func (k *groupKey) IsNull(j int) bool {
 func (k *groupKey) Value(j int) values.Value {
 	return k.values[j]
 }
+
+func (k *groupKey) Sorted(j int) int {
+	return k.sorted[j]
+}
+
 func (k *groupKey) ValueBool(j int) bool {
 	return k.values[j].Bool()
 }

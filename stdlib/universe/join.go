@@ -853,9 +853,14 @@ func (c *MergeJoinCache) buildPostJoinSchema() {
 // Null values are not considered equal when joining (unlike when grouping).
 func equalJoinkeys(left, right flux.GroupKey) bool {
 
-	for j, v := range left.Values() {
+	ll, lr := len(left.Values()), len(right.Values())
+
+	if ll != lr {
+		return false
+	}
+	for i := 0; i < ll; i++ {
 		// value.Equal will return false if both sides are null
-		if !v.Equal(right.Value(j)) {
+		if !left.Value(left.Sorted(i)).Equal(right.Value(right.Sorted(i))) {
 			return false
 		}
 	}

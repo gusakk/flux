@@ -1498,6 +1498,60 @@ func TestMergeJoin_Process(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "inner non sorted tags",
+			spec: &universe.MergeJoinProcedureSpec{
+				TableNames: tableNames,
+				On:         []string{"tg2", "tg1"},
+			},
+			data0: []*executetest.Table{
+				{
+					KeyCols: []string{"rx", "tg1", "tg2"},
+					ColMeta: []flux.ColMeta{
+						{Label: "rx", Type: flux.TString},
+						{Label: "tg1", Type: flux.TString},
+						{Label: "tg2", Type: flux.TString},
+						{Label: "JOURNAL", Type: flux.TInt},
+						{Label: "REPO", Type: flux.TInt},
+					},
+					Data: [][]interface{}{
+						{"rrr1", "tgv10", "tgv20", int64(1), int64(2)},
+						{"rrr2", "tgv11", "tgv21", int64(10), int64(20)},
+					},
+				},
+			},
+			data1: []*executetest.Table{
+				{
+					KeyCols: []string{"rx", "tg2", "tg1"},
+					ColMeta: []flux.ColMeta{
+						{Label: "rx", Type: flux.TString},
+						{Label: "tg2", Type: flux.TString},
+						{Label: "tg1", Type: flux.TString},
+						{Label: "STATUS", Type: flux.TInt},
+					},
+					Data: [][]interface{}{
+						{"rrr1", "tgv20", "tgv10", int64(4)},
+					},
+				},
+			},
+			want: []*executetest.Table{
+				{
+					KeyCols: []string{"rx_a", "rx_b", "tg1", "tg2"},
+					ColMeta: []flux.ColMeta{
+						{Label: "JOURNAL", Type: flux.TInt},
+						{Label: "REPO", Type: flux.TInt},
+						{Label: "STATUS", Type: flux.TInt},
+						{Label: "rx_a", Type: flux.TString},
+						{Label: "rx_b", Type: flux.TString},
+						{Label: "tg1", Type: flux.TString},
+						{Label: "tg2", Type: flux.TString},
+					},
+					Data: [][]interface{}{
+						{int64(1), int64(2), int64(4), "rrr1", "rrr1", "tgv10", "tgv20"},
+					},
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		tc := tc

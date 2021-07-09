@@ -5,6 +5,7 @@ package stdlib
 import (
 	_ "github.com/gusakk/flux/stdlib/csv"
 	_ "github.com/gusakk/flux/stdlib/date"
+	_ "github.com/gusakk/flux/stdlib/ecs"
 	_ "github.com/gusakk/flux/stdlib/experimental"
 	_ "github.com/gusakk/flux/stdlib/experimental/aggregate"
 	_ "github.com/gusakk/flux/stdlib/experimental/bigtable"

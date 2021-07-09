@@ -4625,7 +4625,8 @@ POST /v1/query
       "resources": {
         "priority": "high",
         "concurrency_quota": 0,
-        "memory_bytes_quota": 0
+        "memory_bytes_quota": 0,
+        "sync_query": false
       }
     }
 }

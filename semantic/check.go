@@ -17,9 +17,11 @@ func runChecks(n Node, vars, opts map[string]bool) error {
 		return err
 	}
 	// Check for variable reassignments.
-	if err := varReAssignments(n, vars, opts); err != nil {
+	// Commented this code to support variables reassignment
+	// to not use variables just as a constants.
+	/*if err := varReAssignments(n, vars, opts); err != nil {
 		return err
-	}
+	}*/
 	// Check for dependencies among options.
 	if err := optionDependencies(stmts, opts); err != nil {
 		return err
@@ -111,7 +113,7 @@ func optionReAssignments(stmts []*OptionStatement, vars, options map[string]bool
 	return nil
 }
 
-func varReAssignments(n Node, vars, opts map[string]bool) error {
+/*func varReAssignments(n Node, vars, opts map[string]bool) error {
 	var varDec, optDec *NativeVariableAssignment
 	varFn := func(n *NativeVariableAssignment) {
 		varDec = n
@@ -135,11 +137,11 @@ func varReAssignments(n Node, vars, opts map[string]bool) error {
 		return errors.Newf(codes.Invalid, "cannot declare variable %q at %v; option with same name already declared", name, optDec.Location())
 	}
 	return nil
-}
+}*/
 
 // variable assignment visitor.
 // variable reassignments are passed to errFn.
-type varStmtVisitor struct {
+/*type varStmtVisitor struct {
 	vars, opts   map[string]bool
 	varFn, optFn func(*NativeVariableAssignment)
 	option       bool
@@ -174,7 +176,7 @@ func (v varStmtVisitor) Nest() NestingVisitor {
 	return v
 }
 
-func (v varStmtVisitor) Done(node Node) {}
+func (v varStmtVisitor) Done(node Node) {}*/
 
 func optionDependencies(stmts []*OptionStatement, options map[string]bool) error {
 	var dep *IdentifierExpression

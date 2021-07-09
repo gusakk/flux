@@ -368,6 +368,12 @@ func (t *fixedWindowTransformation) newWindowGroupKey(tbl flux.Table, keyCols []
 func (t *fixedWindowTransformation) clipBounds(bs []execute.Bounds) {
 	for i := range bs {
 		bs[i] = t.bounds.Intersect(bs[i])
+
+		// Check against procedure bounds
+		if bs[i].Start == bs[i].Stop {
+			bs[i].Start = t.bounds.Stop
+			bs[i].Stop = t.bounds.Stop
+		}
 	}
 }
 

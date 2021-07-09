@@ -90,6 +90,20 @@ pub fn builtins() -> Builtins<'static> {
             "experimental/prometheus" => maplit::hashmap! {
                 "scrape" => "forall [t0] where t0: Row (url: string) -> [t0]",
             },
+            "ecs" => maplit::hashmap! {
+                "ecs_package_version" => r#"
+                    forall [t0] where t0: Row (
+                        tables: [[t0]]
+                    ) -> [t0]
+                "#,
+                "timededup" => r#"
+                    forall [t0, t1] where t0: Row, t1: Row (
+                        <-tables: [t0],
+                        ?target: string,
+                        ?compare: string
+                    ) -> [t1]
+                "#,
+            },
             "experimental" => maplit::hashmap! {
                  "addDuration" => "forall [] (d: duration, to: time) -> time",
                  "subDuration" => "forall [] (d: duration, from: time) -> time",
@@ -109,6 +123,17 @@ pub fn builtins() -> Builtins<'static> {
             "http" => maplit::hashmap! {
                 "post" => "forall [t0] where t0: Row (url: string, ?headers: t0, ?data: bytes) -> int",
                 "basicAuth" => "forall [] (u: string, p: string) -> string",
+                "to" => r#"
+                     forall [t0] where t0: Row (
+                         <-tables: [t0],
+                         url: string,
+                         ?method: string,
+                         ?name: string,
+                         ?timeout: duration,
+                         ?timeColumn: string,
+                         ?tagColumns: [string],
+                         ?valueColumns: [string]
+                     ) -> [t0]"#,
             },
             "influxdata/influxdb/secrets" => maplit::hashmap! {
                 "get" => "forall [] (key: string) -> string",
@@ -803,6 +828,12 @@ pub fn builtins() -> Builtins<'static> {
                         ?wantedValue: float,
                         ?columns: [string]
                     ) -> [t1]
+                "#,
+                "fillMissing" => r#"
+                    forall [t0] where t0: Row (
+                        <-tables: [t0],
+                        ?name: string
+                    ) -> [t0]
                 "#,
             },
         },

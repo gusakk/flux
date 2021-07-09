@@ -997,6 +997,54 @@ func TestResolver(t *testing.T) {
 	}
 }
 
+func TestNonYieldQuery(t *testing.T) {
+	testCases := []struct {
+		name  string
+		query string
+		itrp  *interpreter.Interpreter
+		want  []interpreter.SideEffect
+	}{
+		{
+			name:  "default interpreter: nil result",
+			query: "result = six()",
+			itrp:  interpreter.NewInterpreter(interpreter.NewPackage("")),
+			want:  []interpreter.SideEffect(nil),
+		},
+		{
+			name:  "backward compatible interpreter: 6.0",
+			query: "result = six()",
+			itrp:  interpreter.NewBackwardCompatibleInterpreter(interpreter.NewPackage("")),
+			want: []interpreter.SideEffect{
+				{
+					Value: values.NewFloat(6),
+					Node:  (*semantic.ExpressionStatement)(nil),
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			pkg := parser.ParseSource(tc.query)
+			if ast.Check(pkg) > 0 {
+				t.Fatal(ast.GetError(pkg))
+			}
+			graph, err := semantic.New(pkg)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			itrp := tc.itrp
+
+			sideEffects, _ := itrp.Eval(context.TODO(), graph, testScope.Copy(), nil)
+			if !cmp.Equal(tc.want, sideEffects) {
+				t.Fatalf("unexpected side effect values -want/+got: \n%s", cmp.Diff(tc.want, sideEffects))
+			}
+		})
+	}
+}
+
 func getSideEffectsValues(ses []interpreter.SideEffect) []values.Value {
 	vs := make([]values.Value, len(ses))
 	for i, se := range ses {

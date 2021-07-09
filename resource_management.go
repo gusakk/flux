@@ -21,6 +21,10 @@ type ResourceManagement struct {
 	// There is a small amount of overhead memory being consumed by a query that will not be counted towards this limit.
 	// A zero value indicates unlimited.
 	MemoryBytesQuota int64 `json:"memory_bytes_quota"`
+	// SyncQuery is used for `heavy` queries which should be executed sequentially (to not allocate a lot of memory)
+	// also such queries should not be executed in parallel with any other queries due to the same reasons
+	// (memory consumption).
+	SyncQuery bool `json:"sync_query"`
 }
 
 // Priority is an integer that represents the query priority.

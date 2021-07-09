@@ -5,6 +5,7 @@ package stdlib
 import (
 	ast "github.com/gusakk/flux/ast"
 	date "github.com/gusakk/flux/stdlib/date"
+	ecs "github.com/gusakk/flux/stdlib/ecs"
 	experimental "github.com/gusakk/flux/stdlib/experimental"
 	aggregate "github.com/gusakk/flux/stdlib/experimental/aggregate"
 	geo "github.com/gusakk/flux/stdlib/experimental/geo"
@@ -28,6 +29,7 @@ import (
 var FluxTestPackages = func() []*ast.Package {
 	var pkgs []*ast.Package
 	pkgs = append(pkgs, date.FluxTestPackages...)
+	pkgs = append(pkgs, ecs.FluxTestPackages...)
 	pkgs = append(pkgs, experimental.FluxTestPackages...)
 	pkgs = append(pkgs, aggregate.FluxTestPackages...)
 	pkgs = append(pkgs, geo.FluxTestPackages...)

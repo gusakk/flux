@@ -8,6 +8,7 @@ import (
 
 	"github.com/gusakk/flux/codes"
 	"github.com/gusakk/flux/internal/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -37,16 +38,18 @@ type poolDispatcher struct {
 	err     error
 	errC    chan error
 
-	logger *zap.Logger
+	countPanicMetric *prometheus.CounterVec
+	logger           *zap.Logger
 }
 
-func newPoolDispatcher(throughput int, logger *zap.Logger) *poolDispatcher {
+func newPoolDispatcher(throughput int, logger *zap.Logger, panicMetric *prometheus.CounterVec) *poolDispatcher {
 	return &poolDispatcher{
 		throughput: throughput,
 		work:       make(chan ScheduleFunc, 100),
 		closing:    make(chan struct{}),
 		errC:       make(chan error, 1),
 		logger:     logger.With(zap.String("component", "dispatcher")),
+		countPanicMetric: panicMetric,
 	}
 }
 
@@ -77,6 +80,7 @@ func (d *poolDispatcher) Start(n int, ctx context.Context) {
 
 					err = errors.Wrap(err, codes.Internal, "panic")
 					d.setErr(err)
+					d.countPanicMetric.WithLabelValues().Inc()
 					if entry := d.logger.Check(zapcore.InfoLevel, "Dispatcher panic"); entry != nil {
 						entry.Stack = string(debug.Stack())
 						entry.Write(zap.Error(err))

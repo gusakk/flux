@@ -744,7 +744,7 @@ func TestExecutor_Execute(t *testing.T) {
 			// Construct physical query plan
 			plan := plantest.CreatePlanSpec(tc.spec)
 
-			exe := execute.NewExecutor(zaptest.NewLogger(t))
+			exe := execute.NewExecutor(zaptest.NewLogger(t), nil)
 
 			alloc := tc.allocator
 			if alloc == nil {

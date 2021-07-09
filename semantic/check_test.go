@@ -406,7 +406,7 @@ func TestOptionDeclarations(t *testing.T) {
 	}
 }
 
-func TestOptionReAssignments(t *testing.T) {
+/*func TestOptionReAssignments(t *testing.T) {
 	testcases := []struct {
 		name string
 		pkg  *Package
@@ -558,9 +558,9 @@ func TestOptionReAssignments(t *testing.T) {
 			}
 		})
 	}
-}
+}*/
 
-func TestVarReAssignments(t *testing.T) {
+/*func TestVarReAssignments(t *testing.T) {
 	testcases := []struct {
 		name string
 		skip string
@@ -1342,7 +1342,7 @@ func TestVarReAssignments(t *testing.T) {
 			}
 		})
 	}
-}
+}*/
 
 func TestOptionDependencies(t *testing.T) {
 	testcases := []struct {
