@@ -18,15 +18,15 @@ const PredictLinearKind = "predictLinear"
 type PredictLinearOpSpec struct {
 	ValueDst    string   `json:"valueDst"`
 	WantedValue float64  `json:"wantedValue"`
-	Columns     []string `json:"column"`
+	Columns     []string `json:"columns"`
 }
 
 func init() {
-	predictLinearSignature := execute.AggregateSignature(map[string]semantic.PolyType{
+	predictLinearSignature := flux.FunctionSignature(map[string]semantic.PolyType{
 		"valueDst":    semantic.String,
 		"wantedValue": semantic.Float,
 		"columns":     semantic.NewArrayPolyType(semantic.String),
-	}, []string{"columns"})
+	}, nil)
 
 	flux.RegisterPackageValue("universe", PredictLinearKind, flux.FunctionValue(PredictLinearKind, createPredictLinearOpSpec, predictLinearSignature))
 	flux.RegisterOpSpec(PredictLinearKind, newPredictLinearOp)
@@ -85,6 +85,7 @@ func (s *PredictLinearOpSpec) Kind() flux.OperationKind {
 }
 
 type PredictLinearProcedureSpec struct {
+	plan.DefaultCost
 	ValueLabel  string
 	WantedValue float64
 	Columns     []string

@@ -260,6 +260,12 @@ func (t *histogramQuantileTransformation) computeQuantile(cdf []bucket) (float64
 	// Find rank index and check counts are monotonic
 	prevCount := 0.0
 	totalCount := cdf[len(cdf)-1].count
+
+	// For empty set return zero as we have no data to interpolate
+	if totalCount == 0 {
+		return 0, nil
+	}
+
 	rank := t.spec.Quantile * totalCount
 	rankIdx := -1
 	for i, b := range cdf {
@@ -305,6 +311,10 @@ func (t *histogramQuantileTransformation) computeQuantile(cdf []bucket) (float64
 	}
 	if math.IsInf(upperBound, 1) {
 		// We cannot interpolate with infinity
+		return lowerBound, nil
+	}
+	if upperCount == lowerCount {
+		// We cannot interpolate
 		return lowerBound, nil
 	}
 	// Compute quantile using linear interpolation

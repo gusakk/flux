@@ -801,7 +801,7 @@ pub fn builtins() -> Builtins<'static> {
                         <-tables: [t0],
                         ?valueDst: string,
                         ?wantedValue: float,
-                        columns: [string]
+                        ?columns: [string]
                     ) -> [t1]
                 "#,
             },
