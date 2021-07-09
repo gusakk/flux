@@ -44,11 +44,11 @@ type poolDispatcher struct {
 
 func newPoolDispatcher(throughput int, logger *zap.Logger, panicMetric *prometheus.CounterVec) *poolDispatcher {
 	return &poolDispatcher{
-		throughput: throughput,
-		work:       make(chan ScheduleFunc, 100),
-		closing:    make(chan struct{}),
-		errC:       make(chan error, 1),
-		logger:     logger.With(zap.String("component", "dispatcher")),
+		throughput:       throughput,
+		work:             make(chan ScheduleFunc, 100),
+		closing:          make(chan struct{}),
+		errC:             make(chan error, 1),
+		logger:           logger.With(zap.String("component", "dispatcher")),
 		countPanicMetric: panicMetric,
 	}
 }

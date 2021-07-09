@@ -19,7 +19,7 @@ type Interpreter struct {
 	sideEffects     []SideEffect // a list of the side effects occurred during the last call to `Eval`.
 	pkg             *Package
 	modifiedOptions []optionMutation
-	skipYieldCheck bool
+	skipYieldCheck  bool
 }
 
 func NewInterpreter(pkg *Package) *Interpreter {

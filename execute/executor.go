@@ -29,7 +29,7 @@ type Executor interface {
 }
 
 type executor struct {
-	logger *zap.Logger
+	logger      *zap.Logger
 	panicMetric *prometheus.CounterVec
 }
 
@@ -38,7 +38,7 @@ func NewExecutor(logger *zap.Logger, panicMetric *prometheus.CounterVec) Executo
 		logger = zap.NewNop()
 	}
 	e := &executor{
-		logger: logger,
+		logger:      logger,
 		panicMetric: panicMetric,
 	}
 	return e

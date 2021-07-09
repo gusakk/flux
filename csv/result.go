@@ -205,7 +205,7 @@ func (r *channelResultIterator) Err() error {
 // MultiResultDecoder reads multiple results from a single csv file.
 // Results are delimited by an empty line.
 type MultiResultDecoder struct {
-	c ResultDecoderConfig
+	c   ResultDecoderConfig
 	ctx context.Context
 }
 
@@ -215,16 +215,16 @@ func NewMultiResultDecoder(ctx context.Context, c ResultDecoderConfig) *MultiRes
 		c.MaxBufferCount = defaultMaxBufferCount
 	}
 	return &MultiResultDecoder{
-		c: c,
+		c:   c,
 		ctx: ctx,
 	}
 }
 
 func (d *MultiResultDecoder) Decode(r io.ReadCloser) (flux.ResultIterator, error) {
 	return &resultIterator{
-		c:  d.c,
-		r:  r,
-		cr: newCSVReader(r),
+		c:   d.c,
+		r:   r,
+		cr:  newCSVReader(r),
 		ctx: d.ctx,
 	}, nil
 }
